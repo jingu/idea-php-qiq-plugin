@@ -1,0 +1,1 @@
+# idea-php-qiq-plugin
