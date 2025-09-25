@@ -1,0 +1,58 @@
+<idea-plugin>
+    <id>${pluginGroup}.${pluginName}</id>
+    <name>Qiq Templates Support</name>
+    <vendor url="https://github.com/jingu/idea-php-qiq-plugin">Yoshitaka Jingu</vendor>
+    <version>${pluginVersion}</version>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.jetbrains.php</depends>
+    <depends>com.intellij.modules.xml</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType
+                name="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.lang.QiqFileType"
+                language="Qiq"
+                extensions="qiq;qiq.php"
+                fieldName="INSTANCE"/>
+
+        <!-- Template Language の ViewProvider -->
+        <lang.fileViewProviderFactory
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.lang.QiqFileViewProviderFactory"/>
+
+        <!-- ParserDefinition -->
+        <lang.parserDefinition
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.lang.QiqParserDefinition"/>
+
+        <!-- Syntax Highlight -->
+        <lang.syntaxHighlighterFactory
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.highlight.QiqSyntaxHighlighterFactory"/>
+        <editorHighlighterProvider
+                implementationClass="io.github.jingu.idea_qiq_plugin.highlight.QiqEditorHighlighterProvider"
+                filetype="Qiq"/>
+
+        <!-- Color Settings Page -->
+        <colorSettingsPage implementation="io.github.jingu.idea_qiq_plugin.ui.QiqColorSettingsPage"/>
+
+        <!-- Inject php -->
+        <multiHostInjector
+                implementation="io.github.jingu.idea_qiq_plugin.inject.QiqPhpInjector"
+                order="first"
+        />
+        <fileTypeOverrider implementation="io.github.jingu.idea_qiq_plugin.lang.QiqFileTypeOverrider"/>
+
+        <psi.referenceContributor
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
+        <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
+        <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
+    </extensions>
+
+    <!-- PHP ライブラリスタブの登録（任意） -->
+    <extensions defaultExtensionNs="com.jetbrains.php">
+        <libraryRoot id="qiq-runtime" path="/library" runtime="false"/>
+    </extensions>
+</idea-plugin>
