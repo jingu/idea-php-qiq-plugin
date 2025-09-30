@@ -53,14 +53,14 @@ class QiqPhpInjectorTest {
 
         ApplicationManager.getApplication().runReadAction {
             val hosts = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).toList()
-            assertEquals(3, hosts.size, "想定した QiqCodeHost 数と一致しません")
+            assertEquals(3, hosts.size, "Unexpected number of QiqCodeHost elements")
 
             val registrar = RecordingRegistrar()
             injector.getLanguagesToInject(registrar, hosts.first())
 
             val phpCalls = registrar.calls.filter { it.language == PhpLanguage.INSTANCE }
-            assertEquals(3, phpCalls.size, "PHP インジェクション断片が不足しています")
-            assertEquals(hosts.toSet(), phpCalls.map { it.host }.toSet(), "全ホストが注入対象になっていません")
+            assertEquals(3, phpCalls.size, "Missing PHP injection fragments")
+            assertEquals(hosts.toSet(), phpCalls.map { it.host }.toSet(), "Not all hosts received injections")
 
             val assembled = assembleInjectedText(phpCalls)
             assertEquals(expected, assembled)
@@ -72,7 +72,7 @@ class QiqPhpInjectorTest {
                 assertEquals(
                     3,
                     perHostCalls.size,
-                    "ホスト ${'$'}{host.text} の注入結果が一貫していません"
+                    "Injection result is inconsistent for host ${'$'}{host.text}"
                 )
             }
         }
@@ -104,7 +104,7 @@ class QiqPhpInjectorTest {
         }
 
         override fun addPlace(prefix: String?, suffix: String?, host: PsiLanguageInjectionHost, range: TextRange): MultiHostRegistrar {
-            val language = requireNotNull(currentLanguage) { "startInjecting を呼び出す前に addPlace が呼ばれました" }
+            val language = requireNotNull(currentLanguage) { "addPlace called before startInjecting" }
             calls += RecordedCall(language, prefix, suffix, host, range)
             return this
         }
@@ -124,7 +124,7 @@ class QiqPhpInjectorTest {
         }
 
         fun addPlace(prefix: String?, suffix: String?, host: PsiElement, range: TextRange): MultiHostRegistrar {
-            require(host is PsiLanguageInjectionHost) { "PsiLanguageInjectionHost が必要です" }
+            require(host is PsiLanguageInjectionHost) { "PsiLanguageInjectionHost required" }
             return addPlace(prefix, suffix, host, range)
         }
 
