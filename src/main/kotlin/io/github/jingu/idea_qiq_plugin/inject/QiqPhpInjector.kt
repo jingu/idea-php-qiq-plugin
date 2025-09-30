@@ -13,6 +13,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.PhpLanguage
 import io.github.jingu.idea_qiq_plugin.psi.QiqCodeHost
 import io.github.jingu.idea_qiq_plugin.psi.QiqPhpHost
+import io.github.jingu.idea_qiq_plugin.util.QiqUtil
 import java.util.Locale
 
 /**
@@ -151,26 +152,16 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         val snippet = raw.substring(range.startOffset, range.endOffset)
         if (snippet.isEmpty()) return null
 
-        val leadingTrim = snippet.indexOfFirst { !it.isWhitespace() }.let { if (it == -1) 0 else it }
-        val trimmed = snippet.substring(leadingTrim)
-        if (trimmed.isEmpty()) return null
+        val span = QiqUtil.findReservedDirectiveSpan(snippet) ?: return null
 
-        val identifierEnd = trimmed.indexOfFirst { !it.isLetterOrDigit() && it != '_' }
-        if (identifierEnd == 0) return null
+        val parenIndex = snippet.indexOf('(', span.startOffset + span.length)
+        if (parenIndex == -1) return null
 
-        val name = if (identifierEnd == -1) trimmed else trimmed.substring(0, identifierEnd)
-        if (!name.equals("extends", ignoreCase = true)) return null
-
-        var offset = range.startOffset + leadingTrim + name.length
-        while (offset < range.endOffset && raw[offset].isWhitespace()) {
-            offset++
-        }
-
-        if (offset >= range.endOffset || raw[offset] != '(') return null
+        val injectionStart = range.startOffset + parenIndex
 
         return ReservedDirectiveRewrite(
             prefix = "<?php \\QiqRuntimeFunctions::extends",
-            range = TextRange(offset, range.endOffset)
+            range = TextRange(injectionStart, range.endOffset)
         )
     }
 

@@ -1,12 +1,44 @@
 package io.github.jingu.idea_qiq_plugin.util
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService
 
 object QiqUtil {
+    private val reservedDirectiveNames = setOf("extends")
+
+    fun findReservedDirectiveSpan(text: String, directives: Set<String> = reservedDirectiveNames): ReservedDirectiveSpan? {
+        var index = 0
+        val length = text.length
+
+        while (index < length && text[index].isWhitespace()) {
+            index++
+        }
+
+        if (index >= length) return null
+        val nameStart = index
+
+        while (index < length && (text[index].isLetterOrDigit() || text[index] == '_')) {
+            index++
+        }
+
+        if (index == nameStart) return null
+        val name = text.substring(nameStart, index)
+        if (directives.none { it.equals(name, ignoreCase = true) }) return null
+
+        var lookahead = index
+        while (lookahead < length && text[lookahead].isWhitespace()) {
+            lookahead++
+        }
+
+        if (lookahead >= length || text[lookahead] != '(') return null
+
+        return ReservedDirectiveSpan(nameStart, index - nameStart)
+    }
+
     fun isIncludePath(value: String): Boolean {
         val v = value.trim()
 
@@ -65,4 +97,9 @@ object QiqUtil {
 
         return null
     }
+}
+
+data class ReservedDirectiveSpan(val startOffset: Int, val length: Int) {
+    fun toTextRange(baseOffset: Int): TextRange =
+        TextRange(baseOffset + startOffset, baseOffset + startOffset + length)
 }
