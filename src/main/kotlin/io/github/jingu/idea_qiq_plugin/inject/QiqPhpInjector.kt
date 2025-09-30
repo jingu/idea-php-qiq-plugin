@@ -81,6 +81,11 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         val suffix: String?
     )
 
+    private data class ReservedDirectiveRewrite(
+        val prefix: String,
+        val range: TextRange
+    )
+
     private fun buildInjectionFragment(host: PsiLanguageInjectionHost): PhpInjectionFragment? = when (host) {
         is QiqCodeHost -> buildCodeHostFragment(host)
         is QiqPhpHost -> buildPhpHostFragment(host)
@@ -127,6 +132,11 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         } else {
             val lower = trimmedContent.lowercase(Locale.ROOT)
 
+            rewriteReservedDirective(raw, range)?.let {
+                prefix = it.prefix
+                injectionRange = it.range
+            }
+
             val head = lower.substringBefore(' ')
             val needsSemicolon = !trimmedContent.endsWith(";") && !trimmedContent.endsWith(":") &&
                 head !in setOf("else", "elseif", "case", "default")
@@ -137,12 +147,31 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         return PhpInjectionFragment(host, injectionRange, prefix, suffix)
     }
 
-    private fun extractVariables(content: String): Set<String> {
-        val regex = Regex("\\$[a-zA-Z_][a-zA-Z0-9_]*")
-        return regex.findAll(content)
-            .map { it.value }
-            .filterNot { it == "\$this" }
-            .toSet()
+    private fun rewriteReservedDirective(raw: String, range: TextRange): ReservedDirectiveRewrite? {
+        val snippet = raw.substring(range.startOffset, range.endOffset)
+        if (snippet.isEmpty()) return null
+
+        val leadingTrim = snippet.indexOfFirst { !it.isWhitespace() }.let { if (it == -1) 0 else it }
+        val trimmed = snippet.substring(leadingTrim)
+        if (trimmed.isEmpty()) return null
+
+        val identifierEnd = trimmed.indexOfFirst { !it.isLetterOrDigit() && it != '_' }
+        if (identifierEnd == 0) return null
+
+        val name = if (identifierEnd == -1) trimmed else trimmed.substring(0, identifierEnd)
+        if (!name.equals("extends", ignoreCase = true)) return null
+
+        var offset = range.startOffset + leadingTrim + name.length
+        while (offset < range.endOffset && raw[offset].isWhitespace()) {
+            offset++
+        }
+
+        if (offset >= range.endOffset || raw[offset] != '(') return null
+
+        return ReservedDirectiveRewrite(
+            prefix = "<?php \\QiqRuntimeFunctions::extends",
+            range = TextRange(offset, range.endOffset)
+        )
     }
 
     private fun buildPhpHostFragment(host: QiqPhpHost): PhpInjectionFragment? {

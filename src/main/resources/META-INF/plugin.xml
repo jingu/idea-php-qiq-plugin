@@ -34,6 +34,9 @@
         <editorHighlighterProvider
                 implementationClass="io.github.jingu.idea_qiq_plugin.highlight.QiqEditorHighlighterProvider"
                 filetype="Qiq"/>
+        <annotator
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.highlight.QiqReservedDirectiveAnnotator"/>
 
         <!-- Color Settings Page -->
         <colorSettingsPage implementation="io.github.jingu.idea_qiq_plugin.ui.QiqColorSettingsPage"/>
