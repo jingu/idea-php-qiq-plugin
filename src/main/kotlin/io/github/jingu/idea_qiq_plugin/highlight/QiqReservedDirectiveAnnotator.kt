@@ -8,8 +8,8 @@ import com.intellij.psi.PsiElement
 import io.github.jingu.idea_qiq_plugin.psi.QiqCodeHost
 
 /**
- * ハイライトから外れてしまう予約語系ディレクティブ (extends 等) の識別子に
- * Qiq 固有のテキスト属性を適用するための Annotator。
+ * Annotator for applying Qiq-specific text attributes to reserved directive identifiers
+ * (such as "extends") that would otherwise not be highlighted.
  */
 class QiqReservedDirectiveAnnotator : Annotator {
 
