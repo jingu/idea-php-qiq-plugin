@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page</title>
+    {{ setLayout('layouts/main') }}
+</head>
+<body>
+    <h1>{{ $title }}</h1>
+
+    {{ setBlock('content') }}
+    <p>This is the main content.</p>
+    {{ endBlock() }}
+
+    <div>
+        {{ render('partials/sidebar', ['items' => $items]) }}
+    </div>
+
+    <form>
+        {{ textField('username', $username) }}
+        {{ passwordField('password') }}
+        {{ submitButton('Login') }}
+    </form>
+
+    {{ $this->anchor('/home', 'Home') }}
+    {{ $this->linkStylesheet('/css/style.css') }}
+</body>
+</html>
+

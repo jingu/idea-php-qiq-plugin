@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ $title ?? 'Default Title' }}</title>
+</head>
+<body>
+    <header>
+        <h1>{{ $heading }}</h1>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/about">About</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            {{ $content }}
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Test Site</p>
+    </footer>
+</body>
+</html>
+

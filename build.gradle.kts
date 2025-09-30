@@ -1,3 +1,4 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -24,15 +25,29 @@ dependencies {
     intellijPlatform {
         phpstorm("2024.2")                 // ← PhpStorm 2024.2 をビルドターゲットに
         bundledPlugin("com.jetbrains.php") // ← PhpLanguage 等が解決される
+        testFramework(TestFrameworkType.Platform)
+        testFramework(TestFrameworkType.JUnit5)
     }
     testImplementation(kotlin("test"))
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testRuntimeOnly("junit:junit:4.13.2")
+}
+
+val intellijTestDependencies = configurations.named("intellijPlatformTestDependencies")
+
+configurations.named("testImplementation") {
+    extendsFrom(intellijTestDependencies.get())
+}
+
+configurations.named("testRuntimeOnly") {
+    extendsFrom(intellijTestDependencies.get())
 }
 
 intellijPlatform {
     pluginConfiguration {
         name.set("Qiq Templates Support")
         id.set("io.github.jingu.idea-qiq-plugin")
-        version.set("0.1.0")
+        version.set("0.2.0")
         ideaVersion {
             sinceBuild.set("241")
             untilBuild.set("253.*")

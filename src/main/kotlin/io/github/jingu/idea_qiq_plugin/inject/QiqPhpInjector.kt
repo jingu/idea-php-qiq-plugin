@@ -4,8 +4,12 @@ import com.intellij.lang.injection.MultiHostInjector
 import com.intellij.lang.injection.MultiHostRegistrar
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAware
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiLanguageInjectionHost
+import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.PhpLanguage
 import io.github.jingu.idea_qiq_plugin.psi.QiqCodeHost
 import io.github.jingu.idea_qiq_plugin.psi.QiqPhpHost
@@ -20,34 +24,88 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
 
     private val log = Logger.getInstance(QiqPhpInjector::class.java)
 
+    private data class InjectionPlan(
+        val modificationStamp: Long,
+        val fragments: List<PhpInjectionFragment>
+    )
+
+    private val injectionPlanKey = Key.create<InjectionPlan>(
+        "io.github.jingu.idea_qiq_plugin.inject.QiqPhpInjector.PLAN"
+    )
+
     override fun getLanguagesToInject(registrar: MultiHostRegistrar, host: PsiElement) {
-        when (host) {
-            is QiqCodeHost -> injectIntoQiqCodeHost(registrar, host)
-            is QiqPhpHost -> injectIntoQiqPhpHost(registrar, host)
+        if (host !is QiqCodeHost && host !is QiqPhpHost) return
+
+        val file = host.containingFile ?: return
+        val modificationStamp = file.modificationStamp
+
+        val plan = ensureInjectionPlan(file, modificationStamp)
+        if (plan.fragments.isEmpty()) return
+        if (plan.fragments.none { it.host == host }) return
+        if (!host.isValid) return
+
+        registrar.startInjecting(PhpLanguage.INSTANCE)
+        plan.fragments.forEach { fragment ->
+            registrar.addPlace(fragment.prefix, fragment.suffix, fragment.host, fragment.range)
         }
+        registrar.doneInjecting()
     }
 
-    private fun injectIntoQiqCodeHost(registrar: MultiHostRegistrar, host: QiqCodeHost) {
-        if (!host.isValidHost) return
+    private fun ensureInjectionPlan(file: PsiFile, modificationStamp: Long): InjectionPlan {
+        val existing = file.getUserData(injectionPlanKey)
+        if (existing != null && existing.modificationStamp == modificationStamp) {
+            return existing
+        }
+
+        val injectionHosts = collectInjectionHosts(file)
+        val fragments = injectionHosts.mapNotNull { buildInjectionFragment(it) }
+        val plan = InjectionPlan(modificationStamp, fragments)
+        file.putUserData(injectionPlanKey, plan)
+        return plan
+    }
+
+    private fun collectInjectionHosts(file: PsiFile): List<PsiLanguageInjectionHost> {
+        val codeHosts = PsiTreeUtil.collectElementsOfType(file, QiqCodeHost::class.java)
+        val phpHosts = PsiTreeUtil.collectElementsOfType(file, QiqPhpHost::class.java)
+
+        return (codeHosts.asSequence() + phpHosts.asSequence())
+            .filter { it.isValidHost }
+            .sortedBy { it.textRange.startOffset }
+            .toList()
+    }
+
+    private data class PhpInjectionFragment(
+        val host: PsiLanguageInjectionHost,
+        val range: TextRange,
+        val prefix: String?,
+        val suffix: String?
+    )
+
+    private fun buildInjectionFragment(host: PsiLanguageInjectionHost): PhpInjectionFragment? = when (host) {
+        is QiqCodeHost -> buildCodeHostFragment(host)
+        is QiqPhpHost -> buildPhpHostFragment(host)
+        else -> null
+    }
+
+    private fun buildCodeHostFragment(host: QiqCodeHost): PhpInjectionFragment? {
+        if (!host.isValidHost) return null
 
         val raw = host.text
-        if (raw.isEmpty()) return
+        if (raw.isEmpty()) return null
 
-        // Debug hook (will appear in idea.log)
         log.debug("QiqPhpInjector: QiqCodeHost, text='${raw.take(40)}'")
 
-        // Skip leading whitespace for injection
         val leadingWs = raw.indexOfFirst { !it.isWhitespace() }.let { if (it == -1) raw.length else it }
-        if (leadingWs >= raw.length) return
+        if (leadingWs >= raw.length) return null
 
         val lastContentIndex = raw.indexOfLast { !it.isWhitespace() }
-        if (lastContentIndex < leadingWs) return
+        if (lastContentIndex < leadingWs) return null
 
         var range = TextRange(leadingWs, lastContentIndex + 1)
 
         val isPrintLike = host.isPrintLike()
-        var trimmedContent = raw.substring(range.startOffset, range.endOffset).trim()
-        if (trimmedContent.isEmpty()) return
+        val trimmedContent = raw.substring(range.startOffset, range.endOffset).trim()
+        if (trimmedContent.isEmpty()) return null
 
         var prefix = "<?php "
         var suffix = " ?>"
@@ -60,38 +118,23 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
                 while (newStart < range.endOffset && raw[newStart].isWhitespace()) {
                     newStart++
                 }
-                if (newStart >= range.endOffset) return
+                if (newStart >= range.endOffset) return null
                 injectionRange = TextRange(newStart, range.endOffset)
             }
-            val injectionContent = raw.substring(injectionRange.startOffset, injectionRange.endOffset)
-            val variables = extractVariables(injectionContent)
-            prefix = buildPrintPrefix(variables)
+
+            prefix = "<?= "
             suffix = " ?>"
         } else {
             val lower = trimmedContent.lowercase(Locale.ROOT)
 
-            val closingStub = closingDirectiveBody(lower)
-            if (closingStub != null) {
-                prefix += closingStub
-                suffix = "; ?>"
-            } else {
-                val head = lower.substringBefore(' ')
-                val needsSemicolon = !trimmedContent.endsWith(";") && !trimmedContent.endsWith(":") &&
-                    head !in setOf("else", "elseif", "case", "default")
+            val head = lower.substringBefore(' ')
+            val needsSemicolon = !trimmedContent.endsWith(";") && !trimmedContent.endsWith(":") &&
+                head !in setOf("else", "elseif", "case", "default")
 
-                if (needsSemicolon) suffix = "; ?>"
-            }
+            if (needsSemicolon) suffix = "; ?>"
         }
 
-        registrar.startInjecting(PhpLanguage.INSTANCE)
-        registrar.addPlace(prefix, suffix, host, injectionRange)
-        registrar.doneInjecting()
-    }
-
-    private fun buildPrintPrefix(variables: Set<String>): String {
-        if (variables.isEmpty()) return "<?= "
-        val annotations = variables.joinToString(separator = " ") { "/** @var mixed $it */" }
-        return "<?php $annotations ?><?= "
+        return PhpInjectionFragment(host, injectionRange, prefix, suffix)
     }
 
     private fun extractVariables(content: String): Set<String> {
@@ -102,32 +145,17 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
             .toSet()
     }
 
-    private fun closingDirectiveBody(lowerContent: String): String? {
-        return when {
-            lowerContent.startsWith("endif") -> "if (false): "
-            lowerContent.startsWith("endforeach") -> "foreach ([] as ${'$'}__qiqStub): "
-            lowerContent.startsWith("endfor") -> "for (${ '$' }__qiqI = 0; ${ '$' }__qiqI < 0; ${ '$' }__qiqI++): "
-            lowerContent.startsWith("endwhile") -> "while (false): "
-            lowerContent.startsWith("endswitch") -> "switch (false): "
-            else -> null
-        }
-    }
-
-    private fun injectIntoQiqPhpHost(registrar: MultiHostRegistrar, host: QiqPhpHost) {
-        if (!host.isValidHost) return
+    private fun buildPhpHostFragment(host: QiqPhpHost): PhpInjectionFragment? {
+        if (!host.isValidHost) return null
 
         val raw = host.text
-        if (raw.isEmpty()) return
+        if (raw.isEmpty()) return null
 
-        // Debug hook (will appear in idea.log)
         log.debug("QiqPhpInjector: QiqPhpHost, text='${raw.take(40)}'")
 
-        // For PHP blocks, inject the entire content as PHP
         val range = TextRange(0, raw.length)
 
-        registrar.startInjecting(PhpLanguage.INSTANCE)
-        registrar.addPlace("<?php ", " ?>", host, range)
-        registrar.doneInjecting()
+        return PhpInjectionFragment(host, range, "<?php ", " ?>")
     }
 
     override fun elementsToInjectIn(): List<Class<out PsiElement>> =
