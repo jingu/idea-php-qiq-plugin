@@ -46,10 +46,8 @@ class QiqPhpInjectorTest {
         )
 
         val expected = """
-            <?php foreach (${ '$'}items as ${ '$'}item): ?>
-            <?= ${ '$'}item->name ?>
-            <?php endforeach; ?>
-            """.trimIndent() + "\n"
+            <?php foreach (${ '$'}items as ${ '$'}item): ?><?= ${ '$'}item->name ?><?php endforeach; ?>
+            """.trimIndent()
 
         ApplicationManager.getApplication().runReadAction {
             val hosts = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).toList()
