@@ -110,26 +110,6 @@ class QiqPhpInjectorTest {
         override fun doneInjecting() {
             currentLanguage = null
         }
-
-        fun clear() {
-            calls.clear()
-            currentLanguage = null
-        }
-
-        fun addPlace(prefix: String?, suffix: String?, host: PsiLanguageInjectionHost, ranges: List<TextRange>): MultiHostRegistrar {
-            ranges.forEach { addPlace(prefix, suffix, host, it) }
-            return this
-        }
-
-        fun addPlace(prefix: String?, suffix: String?, host: PsiElement, range: TextRange): MultiHostRegistrar {
-            require(host is PsiLanguageInjectionHost) { "PsiLanguageInjectionHost required" }
-            return addPlace(prefix, suffix, host, range)
-        }
-
-        fun addPlace(prefix: String?, suffix: String?, host: PsiElement, ranges: List<TextRange>): MultiHostRegistrar {
-            ranges.forEach { addPlace(prefix, suffix, host, it) }
-            return this
-        }
     }
 
     private data class RecordedCall(
