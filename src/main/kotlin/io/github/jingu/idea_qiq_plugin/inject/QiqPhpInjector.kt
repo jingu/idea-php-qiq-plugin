@@ -108,7 +108,7 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         if (trimmedContent.isEmpty()) return null
 
         var prefix = "<?php "
-        var suffix = " ?>\n"
+        var suffix = " ?>"
         var injectionRange = range
 
         if (isPrintLike) {
@@ -123,7 +123,7 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
             }
 
             prefix = "<?= "
-            suffix = " ?>\n"
+            suffix = " ?>"
         } else {
             val lower = trimmedContent.lowercase(Locale.ROOT)
 
@@ -131,7 +131,7 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
             val needsSemicolon = !trimmedContent.endsWith(";") && !trimmedContent.endsWith(":") &&
                 head !in setOf("else", "elseif", "case", "default")
 
-            if (needsSemicolon) suffix = "; ?>\n"
+            if (needsSemicolon) suffix = "; ?>"
         }
 
         return PhpInjectionFragment(host, injectionRange, prefix, suffix)
@@ -155,7 +155,7 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
 
         val range = TextRange(0, raw.length)
 
-        return PhpInjectionFragment(host, range, "<?php ", " ?>\n")
+        return PhpInjectionFragment(host, range, "<?php ", " ?>")
     }
 
     override fun elementsToInjectIn(): List<Class<out PsiElement>> =
