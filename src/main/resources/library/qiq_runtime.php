@@ -12,7 +12,6 @@
  * --------------------------- */
 function render(string $path, ...$args): string {}
 function setLayout(string $path): void {}
-function extends(string $path): void {}
 
 /* ---------------------------
  * Blocks (functions)
@@ -52,6 +51,19 @@ function ul(array $items, array $attrs = []): string { return ''; }
 /* 1.x/2.x compatibility helpers */
 function metaName($name, $content, array $attrs = []): string { return ''; }     // 1.x/2.x
 function metaHttp($httpEquiv, $content, array $attrs = []): string { return ''; } // 1.x/2.x
+
+/* ------------------------------------------------------
+ * Helper wrapper for reserved-word directives like extends
+ * ------------------------------------------------------ */
+if (!class_exists('QiqRuntimeFunctions')) {
+    /**
+     * @internal IDE helper only: exposes directives that collide with PHP keywords.
+     */
+    final class QiqRuntimeFunctions
+    {
+        public static function extends(string $path): void {}
+    }
+}
 
 /* ---------------------------
  * Form Helpers (3.x; keep broad for convenience)

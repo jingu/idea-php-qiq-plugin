@@ -13,6 +13,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.PhpLanguage
 import io.github.jingu.idea_qiq_plugin.psi.QiqCodeHost
 import io.github.jingu.idea_qiq_plugin.psi.QiqPhpHost
+import io.github.jingu.idea_qiq_plugin.util.QiqUtil
 import java.util.Locale
 
 /**
@@ -81,6 +82,11 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         val suffix: String?
     )
 
+    private data class ReservedDirectiveRewrite(
+        val prefix: String,
+        val range: TextRange
+    )
+
     private fun buildInjectionFragment(host: PsiLanguageInjectionHost): PhpInjectionFragment? = when (host) {
         is QiqCodeHost -> buildCodeHostFragment(host)
         is QiqPhpHost -> buildPhpHostFragment(host)
@@ -127,6 +133,11 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         } else {
             val lower = trimmedContent.lowercase(Locale.ROOT)
 
+            rewriteReservedDirective(raw, range)?.let {
+                prefix = it.prefix
+                injectionRange = it.range
+            }
+
             val head = lower.substringBefore(' ')
             val needsSemicolon = !trimmedContent.endsWith(";") && !trimmedContent.endsWith(":") &&
                 head !in setOf("else", "elseif", "case", "default")
@@ -137,12 +148,21 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         return PhpInjectionFragment(host, injectionRange, prefix, suffix)
     }
 
-    private fun extractVariables(content: String): Set<String> {
-        val regex = Regex("\\$[a-zA-Z_][a-zA-Z0-9_]*")
-        return regex.findAll(content)
-            .map { it.value }
-            .filterNot { it == "\$this" }
-            .toSet()
+    private fun rewriteReservedDirective(raw: String, range: TextRange): ReservedDirectiveRewrite? {
+        val snippet = raw.substring(range.startOffset, range.endOffset)
+        if (snippet.isEmpty()) return null
+
+        val span = QiqUtil.findReservedDirectiveSpan(snippet) ?: return null
+
+        val parenIndex = snippet.indexOf('(', span.startOffset + span.length)
+        if (parenIndex == -1) return null
+
+        val injectionStart = range.startOffset + parenIndex
+
+        return ReservedDirectiveRewrite(
+            prefix = "<?php \\QiqRuntimeFunctions::extends",
+            range = TextRange(injectionStart, range.endOffset)
+        )
     }
 
     private fun buildPhpHostFragment(host: QiqPhpHost): PhpInjectionFragment? {
