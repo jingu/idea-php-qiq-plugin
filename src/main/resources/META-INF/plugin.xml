@@ -58,4 +58,24 @@
     <extensions defaultExtensionNs="com.jetbrains.php">
         <libraryRoot id="qiq-runtime" path="/library" runtime="false"/>
     </extensions>
+    <change-notes><![CDATA[
+<ul>
+  <li><b>Enhanced PHP Language Injection</b>
+    <ul>
+      <li>Qiq blocks within template files are now unified into a single PHP code block with a shared scope.</li>
+      <li>Enables warnings for missing <code>endforeach</code>, <code>endif</code>, and other control structure errors.</li>
+      <li>Provides warnings for undefined variables.</li>
+      <li>Supports variable definitions and type hinting via PHPDoc.</li>
+      <li>Enables code navigation across different Qiq blocks within the same file.</li>
+      <li>All of these are provided through the IDE’s standard PHP development support features.</li>
+    </ul>
+  </li>
+  <li><b>Support for the <code>extends</code> Directive</b>
+    <ul>
+      <li>Added syntax highlighting for the <code>extends</code> directive.</li>
+      <li>Built-in functions using reserved words such as <code>extends</code> are now highlighted using a dedicated Annotator.</li>
+    </ul>
+  </li>
+</ul>
+]]></change-notes>
 </idea-plugin>
