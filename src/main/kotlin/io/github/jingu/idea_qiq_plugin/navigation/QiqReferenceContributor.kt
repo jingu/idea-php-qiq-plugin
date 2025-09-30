@@ -13,14 +13,9 @@ import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import io.github.jingu.idea_qiq_plugin.lang.QiqFileType
 import io.github.jingu.idea_qiq_plugin.lang.QiqTemplateLanguage
 import io.github.jingu.idea_qiq_plugin.util.QiqUtil
-import com.intellij.openapi.diagnostic.Logger
 
 class QiqReferenceContributor : PsiReferenceContributor() {
-    private val LOG = Logger.getInstance(QiqReferenceContributor::class.java)
-
     override fun registerReferenceProviders(registrar: PsiReferenceRegistrar) {
-        LOG.info("QiqReferenceContributor: Registering reference providers")
-
         registrar.registerReferenceProvider(
             PlatformPatterns.psiElement(StringLiteralExpression::class.java),
             object : PsiReferenceProvider() {
@@ -45,13 +40,10 @@ class QiqReferenceContributor : PsiReferenceContributor() {
                     val contextVirtualFile = ilm.getTopLevelFile(element)?.virtualFile
                         ?: element.containingFile?.virtualFile
 
-                    LOG.debug("QiqReferenceContributor: Creating reference for path '$path'")
                     return arrayOf(QiqIncludeReference(element, path, range, contextVirtualFile))
                 }
             }
         )
-
-        LOG.info("QiqReferenceContributor: Reference providers registration completed")
     }
 
     private fun isInQiqFile(element: PsiElement): Boolean {
@@ -88,10 +80,7 @@ class QiqIncludeReference(
 ) :
     PsiReferenceBase<PsiElement>(element, rangeInElement ?: com.intellij.openapi.util.TextRange(0, element.textLength), true) {
 
-    private val LOG = Logger.getInstance(QiqIncludeReference::class.java)
-
     override fun resolve(): PsiElement? {
-        LOG.info("QiqIncludeReference: Attempting to resolve path: '$path'")
         val contextFile = contextVirtualFile ?: element.containingFile?.virtualFile
         val result = QiqUtil.findTemplateByPath(element.project, path, contextFile)
 

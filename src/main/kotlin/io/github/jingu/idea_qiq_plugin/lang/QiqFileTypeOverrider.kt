@@ -30,6 +30,11 @@ class QiqFileTypeOverrider : FileTypeOverrider {
         try {
             if (file.isDirectory) return null
 
+            // 既に Qiq として扱ったファイルは継続して Qiq を返す（再判定で PHP に戻さない）
+            if (file.getUserData(QIQ_MARKER) == true) {
+                return QiqFileType
+            }
+
             // 1) Qiq専用拡張子は即スキップ（拡張子のみでQiqに確定させる）
             //    注意: file.extension は最後のドット以降のみ（".qiq.php" の extension は "php"）
             val nameLower = file.nameSequence.toString().lowercase()

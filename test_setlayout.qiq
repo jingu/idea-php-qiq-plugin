@@ -1,0 +1,29 @@
+{{ setLayout ('layout/base') }}
+{{ setLayout('layout/main') }}
+{{ SETLAYOUT ('layout/admin') }}
+{{ render('template/user') }}
+
+<div class="container">
+    <h1>Welcome to Qiq Template</h1>
+    <p>This is a sample HTML content with <strong>bold text</strong> and <em>italic text</em>.</p>
+    <ul>
+        <li><a href="/home">Home</a></li>
+        <li><a href="/about">About</a></li>
+        <li><a href="/contact">Contact</a></li>
+    </ul>
+    <form action="/submit" method="post">
+        <input type="text" name="username" placeholder="Enter username" />
+        <button type="submit">Submit</button>
+    </form>
+</div>
+
+<script>
+    console.log('JavaScript code should also be highlighted');
+</script>
+
+<style>
+    .container {
+        background-color: #f5f5f5;
+        padding: 20px;
+    }
+</style>
