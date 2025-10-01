@@ -58,6 +58,13 @@
     <extensions defaultExtensionNs="com.jetbrains.php">
         <libraryRoot id="qiq-runtime" path="/library" runtime="false"/>
     </extensions>
+    <actions>
+        <action
+                id="io.github.jingu.idea_qiq_plugin.newfile.QiqCreateFileAction"
+                class="io.github.jingu.idea_qiq_plugin.newfile.QiqCreateFileAction">
+            <add-to-group group-id="NewGroup" anchor="after" relative-to-action="NewFile"/>
+        </action>
+    </actions>
     <change-notes><![CDATA[
 <ul>
   <li><b>Enhanced PHP Language Injection</b>

@@ -17,6 +17,7 @@ class QiqFileTypeOverrider : FileTypeOverrider {
         private fun quickLooksLikeQiq(text: CharSequence): Boolean {
             if (!text.contains("{{")) return false
             if (text.contains("{{=") || text.contains("{{h") || text.contains("{{a")) return true
+            if (text.contains("{{ //") || text.contains("{{//")) return true
             // 少し厳しめに：テンプレ制御
             return Regex("""\{\{\s*(if|foreach|setSection|extends|block|render|setLayout)\b""")
                 .containsMatchIn(text)

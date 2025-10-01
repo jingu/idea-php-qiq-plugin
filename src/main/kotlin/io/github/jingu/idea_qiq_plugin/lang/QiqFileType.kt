@@ -13,6 +13,10 @@ object QiqFileType : LanguageFileType(QiqTemplateLanguage), FileTypeIdentifiable
     override fun getIcon(): Icon = QiqIcons.FILE
 
     override fun isMyFileType(file: VirtualFile): Boolean {
+        if (file.getUserData(QiqFileTypeOverrider.QIQ_MARKER) == true) {
+            return true
+        }
+
         val fileName = file.name
         return fileName.endsWith(".qiq") || fileName.endsWith(".qiq.php")
     }

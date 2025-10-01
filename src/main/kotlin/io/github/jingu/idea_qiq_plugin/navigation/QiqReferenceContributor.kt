@@ -11,6 +11,7 @@ import com.jetbrains.php.lang.psi.elements.FunctionReference
 import com.jetbrains.php.lang.psi.elements.ParameterList
 import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import io.github.jingu.idea_qiq_plugin.lang.QiqFileType
+import io.github.jingu.idea_qiq_plugin.lang.QiqFileTypeOverrider
 import io.github.jingu.idea_qiq_plugin.lang.QiqTemplateLanguage
 import io.github.jingu.idea_qiq_plugin.util.QiqUtil
 
@@ -67,7 +68,9 @@ class QiqReferenceContributor : PsiReferenceContributor() {
 
         // 最後のフォールバック: 拡張子チェック
         val name = topLevel.virtualFile?.name ?: return false
-        return name.endsWith(".qiq") || name.endsWith(".qiq.php")
+        if (name.endsWith(".qiq") || name.endsWith(".qiq.php")) return true
+
+        return topLevel.virtualFile?.getUserData(QiqFileTypeOverrider.QIQ_MARKER) == true
     }
 
 }
