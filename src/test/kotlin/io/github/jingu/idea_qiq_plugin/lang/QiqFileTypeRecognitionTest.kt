@@ -2,6 +2,7 @@ package io.github.jingu.idea_qiq_plugin.lang
 
 import com.intellij.testFramework.LightVirtualFile
 import kotlin.test.Test
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -27,5 +28,17 @@ class QiqFileTypeRecognitionTest {
         val result = QiqFileType.isMyFileType(virtualFile)
 
         assertTrue(result, ".php file with Qiq marker must be treated as Qiq")
+    }
+
+    @Test
+    fun `missing closing delimiter is ignored`() {
+        val fileContent = "{{ extends('layout')\n"
+        val virtualFile = LightVirtualFile("broken_template.php", fileContent)
+
+        val overrider = QiqFileTypeOverrider()
+        val overridden = overrider.getOverriddenFileType(virtualFile)
+
+        assertNull(overridden, "File without closing delimiter should remain original type")
+        assertTrue(virtualFile.getUserData(QiqFileTypeOverrider.QIQ_MARKER) != true)
     }
 }
