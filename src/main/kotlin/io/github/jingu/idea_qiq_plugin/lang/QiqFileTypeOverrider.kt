@@ -55,11 +55,7 @@ class QiqFileTypeOverrider : FileTypeOverrider {
         file.putUserData(REENTRANT_GUARD, true)
         try {
             // 4) 中身を読む（※ file.fileType は絶対触らない：無限再帰の原因になる）
-            val text = try {
-                VfsUtilCore.loadText(file)
-            } catch (_: Throwable) {
-                return null
-            }
+            val text = runCatching { VfsUtilCore.loadText(file) }.getOrElse { return null }
 
             // 5) 軽いチェック
             if (!quickLooksLikeQiq(text)) return null

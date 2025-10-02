@@ -63,9 +63,11 @@ class QiqFileTypeOverriderTest {
                 "Marker flag should be set to avoid repeated re-evaluation"
             )
         } finally {
-            Files.walk(tempDir)
-                .sorted(Comparator.reverseOrder())
-                .forEach { Files.deleteIfExists(it) }
+            runCatching {
+                Files.walk(tempDir).use { stream ->
+                    stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+                }
+            }
         }
     }
 }
