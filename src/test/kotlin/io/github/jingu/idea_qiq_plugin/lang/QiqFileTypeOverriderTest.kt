@@ -37,37 +37,28 @@ class QiqFileTypeOverriderTest {
     }
 
     @Test
-    fun `overrides local virtual file`() {
+    fun `overrides local virtual file`(@org.junit.jupiter.api.io.TempDir tempDir: java.nio.file.Path) {
         val text = """
             {{ setSection('header') }}
             content
             {{ endSection() }}
         """.trimIndent()
 
-        val tempDir = Files.createTempDirectory("qiq-overrider-test")
-        try {
-            val path = tempDir.resolve("template.php")
-            Files.writeString(path, text, StandardCharsets.UTF_8)
+        val path = tempDir.resolve("template.php")
+        Files.writeString(path, text, StandardCharsets.UTF_8)
 
-            val virtualFile = WriteAction.compute<VirtualFile?, RuntimeException> {
-                LocalFileSystem.getInstance().refreshAndFindFileByIoFile(path.toFile())
-            } ?: error("Virtual file not found for temp file")
+        val virtualFile = WriteAction.compute<VirtualFile?, RuntimeException> {
+            LocalFileSystem.getInstance().refreshAndFindFileByIoFile(path.toFile())
+        } ?: error("Virtual file not found for temp file")
 
-            val type: FileType? = ReadAction.compute<FileType?, RuntimeException> {
-                overrider.getOverriddenFileType(virtualFile)
-            }
-
-            assertEquals(QiqFileType, type, "Local template should be detected as Qiq")
-            assertTrue(
-                virtualFile.getUserData(QiqFileTypeOverrider.QIQ_MARKER) == true,
-                "Marker flag should be set to avoid repeated re-evaluation"
-            )
-        } finally {
-            runCatching {
-                Files.walk(tempDir).use { stream ->
-                    stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
-                }
-            }
+        val type: FileType? = ReadAction.compute<FileType?, RuntimeException> {
+            overrider.getOverriddenFileType(virtualFile)
         }
+
+        assertEquals(QiqFileType, type, "Local template should be detected as Qiq")
+        assertTrue(
+            virtualFile.getUserData(QiqFileTypeOverrider.QIQ_MARKER) == true,
+            "Marker flag should be set to avoid repeated re-evaluation"
+        )
     }
 }
