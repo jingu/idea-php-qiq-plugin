@@ -13,13 +13,17 @@ class QiqFileTypeOverrider : FileTypeOverrider {
 
         private val REENTRANT_GUARD: Key<Boolean> = Key.create("qiq.overrider.guard")
 
+        private val CANDIDATE_EXTENSIONS = setOf("php", "phtml", "html", "htm", "tpl")
+        private const val SIZE_LIMIT_BYTES: Long = 5_000_000
+        private val CONTROL_PATTERN = Regex("""\{\{\s*(if|foreach|setSection|extends|block|render|setLayout)\b""")
+
         // よく使うトークンで早期判定（軽いチェック）
         private fun quickLooksLikeQiq(text: CharSequence): Boolean {
             if (!text.contains("{{")) return false
             if (text.contains("{{=") || text.contains("{{h") || text.contains("{{a")) return true
+            if (text.contains("{{ //") || text.contains("{{//")) return true
             // 少し厳しめに：テンプレ制御
-            return Regex("""\{\{\s*(if|foreach|setSection|extends|block|render|setLayout)\b""")
-                .containsMatchIn(text)
+            return CONTROL_PATTERN.containsMatchIn(text)
         }
     }
 
@@ -44,11 +48,11 @@ class QiqFileTypeOverrider : FileTypeOverrider {
 
             // 2) 対象候補のみ内容判定（誤検知＆無駄I/O削減）
             val ext = file.extension?.lowercase()
-            val candidate = ext == null || ext in setOf("php", "phtml", "html", "htm", "tpl")
+            val candidate = ext == null || ext in CANDIDATE_EXTENSIONS
             if (!candidate) return null
 
             // 3) サイズ上限（巨大ファイルは避ける）
-            if (file.length > 5_000_000) return null
+            if (file.length > SIZE_LIMIT_BYTES) return null
 
             // 4) 中身を読む（※ file.fileType は絶対触らない：無限再帰の原因になる）
             val text = try {
@@ -60,17 +64,8 @@ class QiqFileTypeOverrider : FileTypeOverrider {
             // 5) 軽いチェック
             if (!quickLooksLikeQiq(text)) return null
 
-            // 6) 厳しめチェック（Qiq固有トークン＋閉じ "}}" の共起）
-            val sure = (text.contains("{{"))
-                    || (text.contains("{{=")
-                    || text.contains("{{h")
-                    || text.contains("{{a")
-                    || text.contains("{{u")
-                    || text.contains("{{c")
-                    || text.contains("{{j"))
-                    && text.contains("}}")
-
-            if (sure) {
+            // 6) 厳しめチェック（閉じ "}}" の存在のみ確認：quick 判定で十分な指標を満たしている）
+            if (text.contains("}}")) {
                 file.putUserData(QIQ_MARKER, true)
                 return QiqFileType
             }
