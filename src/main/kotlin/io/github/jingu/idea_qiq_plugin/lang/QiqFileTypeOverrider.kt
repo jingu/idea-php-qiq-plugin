@@ -5,6 +5,7 @@ import com.intellij.openapi.fileTypes.impl.FileTypeOverrider
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileWithId
 
 class QiqFileTypeOverrider : FileTypeOverrider {
 
@@ -24,11 +25,15 @@ class QiqFileTypeOverrider : FileTypeOverrider {
     }
 
     override fun getOverriddenFileType(file: VirtualFile): FileType? {
+        if (file !is VirtualFileWithId) return null
+        if (file.isDirectory) return null
+        if (!file.isValid) return null
+        if (!file.isInLocalFileSystem) return null
+
         // 再入防止
         if (file.getUserData(REENTRANT_GUARD) == true) return null
         file.putUserData(REENTRANT_GUARD, true)
         try {
-            if (file.isDirectory) return null
 
             // 既に Qiq として扱ったファイルは継続して Qiq を返す（再判定で PHP に戻さない）
             if (file.getUserData(QIQ_MARKER) == true) {
