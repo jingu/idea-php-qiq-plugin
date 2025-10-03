@@ -194,7 +194,7 @@ class QiqCommenter : CommenterWithLineSuffix, SelfManagingCommenter<CommenterDat
     }
 
     companion object {
-        private val HTML_TAG_REGEX = Regex("<[/a-zA-Z][^>]*>")
+        private val HTML_TAG_REGEX = Regex("<[/a-zA-Z][^>]*/?>")
         private val COMMENT_INSERT_REGEX = Regex("\\{\\{(?!\\s*//)")
         private val COMMENT_REMOVE_REGEX = Regex("\\{\\{//")
     }
