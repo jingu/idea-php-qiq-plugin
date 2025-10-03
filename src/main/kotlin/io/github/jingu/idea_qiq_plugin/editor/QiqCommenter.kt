@@ -38,43 +38,14 @@ class QiqCommenter : CommenterWithLineSuffix, SelfManagingCommenter<CommenterDat
     override fun commentLine(line: Int, offset: Int, document: Document, state: CommenterDataHolder) {
         val range = lineRange(line, document) ?: return
         val original = document.getText(range)
-        if (original.isBlank() || isAlreadyCommented(original)) {
-            return
-        }
-
-        val (indent, content, trailing) = splitLine(original)
-        if (content.isEmpty()) {
-            return
-        }
-
-        val updated = when {
-            shouldUseHtmlComment(content) -> indent + formatAsHtmlComment(content) + trailing
-            else -> indent + formatAsQiqComment(content) + trailing
-        }
-
+        val updated = commentLineText(original) ?: return
         document.replaceString(range.startOffset, range.endOffset, updated)
     }
 
     override fun uncommentLine(line: Int, offset: Int, document: Document, state: CommenterDataHolder) {
         val range = lineRange(line, document) ?: return
         val current = document.getText(range)
-        if (current.isBlank()) {
-            return
-        }
-
-        val (indent, content, trailing) = splitLine(current)
-        if (content.isEmpty()) {
-            return
-        }
-
-        val restored = when {
-            content.startsWith("<!-- ") && content.endsWith(" -->") ->
-                indent + restoreFromHtmlComment(content) + trailing
-            content.startsWith("{{ // ") && content.endsWith(" }}") ->
-                indent + content.removePrefix("{{ // ").removeSuffix(" }}") + trailing
-            else -> return
-        }
-
+        val restored = uncommentLineText(current) ?: return
         document.replaceString(range.startOffset, range.endOffset, restored)
     }
 
@@ -127,6 +98,45 @@ class QiqCommenter : CommenterWithLineSuffix, SelfManagingCommenter<CommenterDat
         document: Document,
         data: CommenterDataHolder
     ): TextRange? = null
+
+    internal fun commentLineText(line: String): String? {
+        if (line.isBlank() || isAlreadyCommented(line)) {
+            return null
+        }
+
+        val (indent, content, trailing) = splitLine(line)
+        if (content.isEmpty()) {
+            return null
+        }
+
+        val commentedContent = if (shouldUseHtmlComment(content)) {
+            formatAsHtmlComment(content)
+        } else {
+            formatAsQiqComment(content)
+        }
+
+        return indent + commentedContent + trailing
+    }
+
+    internal fun uncommentLineText(line: String): String? {
+        if (line.isBlank()) {
+            return null
+        }
+
+        val (indent, content, trailing) = splitLine(line)
+        if (content.isEmpty()) {
+            return null
+        }
+
+        val restoredContent = when {
+            content.startsWith("<!-- ") && content.endsWith(" -->") -> restoreFromHtmlComment(content)
+            content.startsWith("{{ // ") && content.endsWith(" }}") ->
+                content.removePrefix("{{ // ").removeSuffix(" }}")
+            else -> return null
+        }
+
+        return indent + restoredContent + trailing
+    }
 
     private fun lineRange(line: Int, document: Document): TextRange? {
         if (line < 0 || line >= document.lineCount) return null
