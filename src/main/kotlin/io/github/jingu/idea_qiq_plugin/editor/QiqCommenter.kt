@@ -182,7 +182,7 @@ class QiqCommenter : CommenterWithLineSuffix, SelfManagingCommenter<CommenterDat
     }
 
     private fun commentQiqExpressions(content: String): String =
-        if (content.contains("{{")) COMMENT_INSERT_REGEX.replace(content) { "{{//" } else content
+        if (content.contains("{{")) COMMENT_INSERT_REGEX.replace(content, "{{//") else content
 
     private fun restoreQiqExpressions(content: String): String =
         if (content.contains("{{//")) COMMENT_REMOVE_REGEX.replace(content, "{{") else content
