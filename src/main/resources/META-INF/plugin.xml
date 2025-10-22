@@ -70,14 +70,15 @@
     </actions>
     <change-notes><![CDATA[
 <ul>
-  <li><b>Safer File Type Detection</b>
+  <li><b>HTML-aware Comment Toggle</b>
     <ul>
-      <li>File type override logic now ignores virtual files, fixing copy/paste dialogs that became unresponsive when the plugin was installed.</li>
+      <li>Lines containing HTML tags with embedded Qiq expressions now wrap in <code><!-- --></code> and comment the expressions safely.</li>
+      <li>Existing comments and blank or whitespace-only lines are detected to avoid double commenting.</li>
     </ul>
   </li>
-  <li><b>New Template Creation Action</b>
+  <li><b>Reliability Improvements</b>
     <ul>
-      <li>You can now create Qiq templates directly from the context menu via <code>QiqCreateFileAction</code>, making new file creation faster.</li>
+      <li>Added unit tests that exercise the QiqCommenter comment/uncomment round-trip.</li>
     </ul>
   </li>
 </ul>
