@@ -50,7 +50,7 @@ intellijPlatform {
         version.set("0.4.0")
         ideaVersion {
             sinceBuild.set("241")
-            untilBuild.set("253.*")
+            untilBuild.set("261.*")
         }
         description.set("Syntax highlighting and simple navigation for Qiq templates")
         vendor {
