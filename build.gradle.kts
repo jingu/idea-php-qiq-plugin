@@ -44,10 +44,16 @@ configurations.named("testRuntimeOnly") {
 }
 
 intellijPlatform {
+    pluginVerification {
+        ides {
+            ide(org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.PhpStorm, "2024.2")
+            ide(org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.PhpStorm, "2026.1")
+        }
+    }
     pluginConfiguration {
         name.set("Qiq Templates Support")
         id.set("io.github.jingu.idea-qiq-plugin")
-        version.set("0.4.0")
+        version.set("0.5.0")
         ideaVersion {
             sinceBuild.set("241")
             untilBuild.set("261.*")

@@ -70,15 +70,9 @@
     </actions>
     <change-notes><![CDATA[
 <ul>
-  <li><b>HTML-aware Comment Toggle</b>
+  <li><b>PhpStorm 2026.1 Support</b>
     <ul>
-      <li>Lines containing HTML tags with embedded Qiq expressions now wrap in <code><!-- --></code> and comment the expressions safely.</li>
-      <li>Existing comments and blank or whitespace-only lines are detected to avoid double commenting.</li>
-    </ul>
-  </li>
-  <li><b>Reliability Improvements</b>
-    <ul>
-      <li>Added unit tests that exercise the QiqCommenter comment/uncomment round-trip.</li>
+      <li>Extended compatibility to PhpStorm 2026.1 (build 261).</li>
     </ul>
   </li>
 </ul>
