@@ -1,5 +1,8 @@
 # Qiq Templates Support Plugin
 
+[![Version](https://img.shields.io/jetbrains/plugin/v/28576)](https://plugins.jetbrains.com/plugin/28576)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/28576)](https://plugins.jetbrains.com/plugin/28576)
+
 Qiq Templates Support is an IntelliJ-based plugin that brings syntax highlighting, navigation, PHP injection, and other IDE niceties to [Qiq templates](https://qiqphp.com). It targets JetBrains IDEs that can host the PhpStorm platform (PhpStorm, IntelliJ Ultimate with PHP plugin, etc.).
 
 ## Features
