@@ -11,8 +11,10 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiLanguageInjectionHost
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.PhpLanguage
+import io.github.jingu.idea_qiq_plugin.lang.QiqTokenTypes
 import io.github.jingu.idea_qiq_plugin.psi.QiqCodeHost
 import io.github.jingu.idea_qiq_plugin.psi.QiqPhpHost
+import io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService
 import io.github.jingu.idea_qiq_plugin.util.QiqUtil
 import java.util.Locale
 
@@ -24,6 +26,13 @@ import java.util.Locale
 class QiqPhpInjector : MultiHostInjector, DumbAware {
 
     private val log = Logger.getInstance(QiqPhpInjector::class.java)
+
+    // Per-file dedup: emit the resolved stub selection once per file so that
+    // users (and bug reports) can verify which QiqRuntimeFunctions* class is
+    // being injected without scanning thousands of duplicate lines. Logged at
+    // debug level — enable `io.github.jingu.idea_qiq_plugin.inject.QiqPhpInjector`
+    // in Help > Diagnostic Tools > Debug Log Settings to surface it.
+    private val stubSelectionLogged = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     private data class InjectionPlan(
         val modificationStamp: Long,
@@ -118,18 +127,34 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         var injectionRange = range
 
         if (isPrintLike) {
-            val firstChar = trimmedContent.first()
-            if (firstChar in setOf('=', 'h', 'j', 'a', 'u', 'c')) {
-                var newStart = range.startOffset + 1
-                while (newStart < range.endOffset && raw[newStart].isWhitespace()) {
-                    newStart++
-                }
-                if (newStart >= range.endOffset) return null
-                injectionRange = TextRange(newStart, range.endOffset)
-            }
+            // The parser strips the leading modifier byte (h/a/j/u/c/=) from the host
+            // text and encodes it in the element type instead, so derive the directive
+            // from the element type. Defensive fallback to the first character handles
+            // legacy PSI shapes (text-based kind detection in QiqCodeHost).
+            val escapeMethod = escapeMethodFor(host)
 
-            prefix = "<?= "
-            suffix = " ?>"
+            if (escapeMethod != null) {
+                // Route escape directives through QiqRuntimeFunctions* so that
+                // PhpStorm validates the argument against the PHPDoc signature.
+                // The runtime class is picked based on the qiq/qiq major
+                // version detected in composer.lock: v1 has string-only
+                // signatures, while v2+ accept null|scalar|\Stringable.
+                val runtimeClass = resolveRuntimeClass(host)
+                prefix = "<?= \\$runtimeClass::$escapeMethod("
+                suffix = ") ?>"
+            } else {
+                // {{= ... }} or unclassified print-like host: emit a plain echo tag.
+                if (trimmedContent.first() == '=') {
+                    var newStart = range.startOffset + 1
+                    while (newStart < range.endOffset && raw[newStart].isWhitespace()) {
+                        newStart++
+                    }
+                    if (newStart >= range.endOffset) return null
+                    injectionRange = TextRange(newStart, range.endOffset)
+                }
+                prefix = "<?= "
+                suffix = " ?>"
+            }
         } else {
             val lower = trimmedContent.lowercase(Locale.ROOT)
 
@@ -146,6 +171,25 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         }
 
         return PhpInjectionFragment(host, injectionRange, prefix, suffix)
+    }
+
+    private fun resolveRuntimeClass(host: QiqCodeHost): String {
+        val vf = host.containingFile?.virtualFile ?: return DEFAULT_RUNTIME_CLASS
+        val major = QiqSettingsService.getInstance(host.project).resolveQiqMajorVersion(vf)
+        val runtimeClass = if (major == 1) STRICT_RUNTIME_CLASS else DEFAULT_RUNTIME_CLASS
+        if (stubSelectionLogged.add(vf.path) && log.isDebugEnabled) {
+            log.debug("Qiq stub selection: major=$major, class=$runtimeClass, file=${vf.path}")
+        }
+        return runtimeClass
+    }
+
+    private fun escapeMethodFor(host: QiqCodeHost): Char? = when (host.node.elementType) {
+        QiqTokenTypes.ESCAPE_H_CONTENT -> 'h'
+        QiqTokenTypes.ESCAPE_A_CONTENT -> 'a'
+        QiqTokenTypes.ESCAPE_J_CONTENT -> 'j'
+        QiqTokenTypes.ESCAPE_U_CONTENT -> 'u'
+        QiqTokenTypes.ESCAPE_C_CONTENT -> 'c'
+        else -> null
     }
 
     private fun rewriteReservedDirective(raw: String, range: TextRange): ReservedDirectiveRewrite? {
@@ -180,4 +224,9 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
 
     override fun elementsToInjectIn(): List<Class<out PsiElement>> =
         listOf(QiqCodeHost::class.java, QiqPhpHost::class.java)
+
+    companion object {
+        private const val DEFAULT_RUNTIME_CLASS = "QiqRuntimeFunctions"
+        private const val STRICT_RUNTIME_CLASS = "QiqRuntimeFunctionsStrict"
+    }
 }

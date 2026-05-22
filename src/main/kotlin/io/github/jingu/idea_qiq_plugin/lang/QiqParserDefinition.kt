@@ -104,9 +104,17 @@ private enum class QiqBlockKind(
         QiqTokenTypes.RBRACE_EQ,
         QiqTokenTypes.CLOSE_EQ
     ),
-    ESCAPE_GENERIC(
-        QiqTokenTypes.ESCAPE_CONTENT,
+    ESCAPE_ATTR(
+        QiqTokenTypes.ESCAPE_A_CONTENT,
+        QiqTokenTypes.RBRACEA,
         QiqTokenTypes.RBRACEC,
+        QiqTokenTypes.CLOSE_A,
+        QiqTokenTypes.CLOSE_C
+    ),
+    ESCAPE_CSS(
+        QiqTokenTypes.ESCAPE_C_CONTENT,
+        QiqTokenTypes.RBRACEC,
+        QiqTokenTypes.RBRACEA,
         QiqTokenTypes.CLOSE_C,
         QiqTokenTypes.CLOSE_A
     ),
@@ -136,12 +144,12 @@ private fun IElementType?.blockKind(): QiqBlockKind? = when (this) {
     QiqTokenTypes.RAW_OPEN,
     QiqTokenTypes.LBRACE_EQ,
     QiqTokenTypes.OPEN_EQ -> QiqBlockKind.RAW
-    QiqTokenTypes.ESCAPE_C_OPEN,
     QiqTokenTypes.ESCAPE_A_OPEN,
-    QiqTokenTypes.LBRACEC,
     QiqTokenTypes.LBRACEA,
-    QiqTokenTypes.OPEN_C,
-    QiqTokenTypes.OPEN_A -> QiqBlockKind.ESCAPE_GENERIC
+    QiqTokenTypes.OPEN_A -> QiqBlockKind.ESCAPE_ATTR
+    QiqTokenTypes.ESCAPE_C_OPEN,
+    QiqTokenTypes.LBRACEC,
+    QiqTokenTypes.OPEN_C -> QiqBlockKind.ESCAPE_CSS
     QiqTokenTypes.ESCAPE_H_OPEN,
     QiqTokenTypes.LBRACEH,
     QiqTokenTypes.OPEN_H -> QiqBlockKind.ESCAPE_HTML

@@ -57,11 +57,56 @@ function metaHttp($httpEquiv, $content, array $attrs = []): string { return ''; 
  * ------------------------------------------------------ */
 if (!class_exists('QiqRuntimeFunctions')) {
     /**
-     * @internal IDE helper only: exposes directives that collide with PHP keywords.
+     * @internal IDE helper only: surfaces Qiq compiler-generated calls so PhpStorm
+     * inspections can validate them.
+     *
+     * - `extends` is exposed because the directive collides with a PHP keyword.
+     * - `h/a/j/u/c` mirror Qiq\Template::h()/a()/j()/u()/c() but as static methods,
+     *   carrying the same PHPDoc constraints. Qiq compiles `{{h $x }}` into
+     *   `<?= $this->h($x) ?>`, but $this is untyped inside template scope so the
+     *   plugin routes escape directives through this helper to make the
+     *   `null|scalar|\Stringable` signature visible to inspections.
      */
     final class QiqRuntimeFunctions
     {
         public static function extends(string $path): void {}
+
+        /** @param null|scalar|\Stringable $raw */
+        public static function h(mixed $raw): string { return ''; }
+
+        /** @param null|scalar|\Stringable|array<null|scalar|\Stringable|array<null|scalar|\Stringable>> $raw */
+        public static function a(mixed $raw): string { return ''; }
+
+        /** @param null|scalar|\Stringable $raw */
+        public static function j(mixed $raw): string { return ''; }
+
+        /** @param null|scalar|\Stringable $raw */
+        public static function u(mixed $raw): string { return ''; }
+
+        /** @param null|scalar|\Stringable $raw */
+        public static function c(mixed $raw): string { return ''; }
+    }
+}
+
+if (!class_exists('QiqRuntimeFunctionsStrict')) {
+    /**
+     * @internal IDE helper only: mirrors Qiq 1.x Escape signatures which
+     * accept `string` (and `string|array` for `a()`) only. Used by the
+     * plugin when composer.lock pins qiq/qiq to ^1.0; v2.x/v3.x relax
+     * the signature to `mixed` and use {@see QiqRuntimeFunctions}.
+     */
+    final class QiqRuntimeFunctionsStrict
+    {
+        public static function h(string $raw): string { return ''; }
+
+        /** @param string|array<array-key, string|array> $raw */
+        public static function a(string|array $raw): string { return ''; }
+
+        public static function j(string $raw): string { return ''; }
+
+        public static function u(string $raw): string { return ''; }
+
+        public static function c(string $raw): string { return ''; }
     }
 }
 
