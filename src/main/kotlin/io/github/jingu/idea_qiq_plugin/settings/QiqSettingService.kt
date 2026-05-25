@@ -90,7 +90,9 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
     // ---- simple cache ----
 
     private data class CacheKey(val path: String)
-    private val cacheMap = mutableMapOf<CacheKey, List<VirtualFile>>()
+    // Same rationale as composerLockCache: resolveTemplateRoots is called
+    // from completion/navigation contributors running on parallel ReadActions.
+    private val cacheMap = ConcurrentHashMap<CacheKey, List<VirtualFile>>()
 
     private fun getCached(contextFile: VirtualFile): List<VirtualFile> =
         cacheMap[CacheKey(contextFile.path)] ?: emptyList()
