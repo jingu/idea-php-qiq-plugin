@@ -12,6 +12,7 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import io.github.jingu.idea_qiq_plugin.util.QiqComposerVersionResolver
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 
 @Service(Service.Level.PROJECT)
@@ -81,7 +82,10 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
     }
 
     private data class ComposerLockEntry(val modificationStamp: Long, val majorVersion: Int)
-    private val composerLockCache = mutableMapOf<String, ComposerLockEntry>()
+    // ConcurrentHashMap: resolveQiqMajorVersion may be invoked from parallel
+    // ReadActions (e.g. concurrent PSI injection across files), so the cache
+    // backing store must tolerate concurrent put/get without map corruption.
+    private val composerLockCache = ConcurrentHashMap<String, ComposerLockEntry>()
 
     // ---- simple cache ----
 

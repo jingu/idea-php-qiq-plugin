@@ -71,20 +71,24 @@ if (!class_exists('QiqRuntimeFunctions')) {
     {
         public static function extends(string $path): void {}
 
+        // Parameters are typed via PHPDoc only; the native `mixed` keyword
+        // (PHP 8.0+) would break stub parsing for projects whose Language
+        // Level is set to PHP 7.x.
+
         /** @param null|scalar|\Stringable $raw */
-        public static function h(mixed $raw): string { return ''; }
+        public static function h($raw): string { return ''; }
 
         /** @param null|scalar|\Stringable|array<null|scalar|\Stringable|array<null|scalar|\Stringable>> $raw */
-        public static function a(mixed $raw): string { return ''; }
+        public static function a($raw): string { return ''; }
 
         /** @param null|scalar|\Stringable $raw */
-        public static function j(mixed $raw): string { return ''; }
+        public static function j($raw): string { return ''; }
 
         /** @param null|scalar|\Stringable $raw */
-        public static function u(mixed $raw): string { return ''; }
+        public static function u($raw): string { return ''; }
 
         /** @param null|scalar|\Stringable $raw */
-        public static function c(mixed $raw): string { return ''; }
+        public static function c($raw): string { return ''; }
     }
 }
 
@@ -99,8 +103,12 @@ if (!class_exists('QiqRuntimeFunctionsStrict')) {
     {
         public static function h(string $raw): string { return ''; }
 
+        // a() accepts `string|array` in Qiq 1.x. The union type is PHP 8.0+
+        // syntax, so it is expressed via PHPDoc to keep the stub parseable
+        // under PHP 7.x language levels.
+
         /** @param string|array<array-key, string|array> $raw */
-        public static function a(string|array $raw): string { return ''; }
+        public static function a($raw): string { return ''; }
 
         public static function j(string $raw): string { return ''; }
 

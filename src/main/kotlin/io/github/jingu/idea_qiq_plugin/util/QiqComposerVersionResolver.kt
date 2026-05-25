@@ -71,8 +71,10 @@ object QiqComposerVersionResolver {
 
     private fun extractMajor(version: String): Int? {
         // Strip a leading `v` (e.g. "v3.0.1") and take the prefix up to the
-        // first dot. Reject anything that does not parse as an integer (e.g.
-        // "dev-main", "3.x-dev").
+        // first dot, then parse as Int. This intentionally accepts floating
+        // dev branches like "3.x-dev" (head "3" → 3) so users tracking
+        // unreleased majors still get the right stub. Pure "dev-main" /
+        // "dev-master" yield null because the head is not an integer.
         val trimmed = version.trim().removePrefix("v")
         val head = trimmed.substringBefore('.')
         return head.toIntOrNull()
