@@ -36,20 +36,19 @@ class QiqPhpInjectorTest {
 
     @Test
     fun aggregatesAllFragmentsIntoSinglePhpStream(project: Project) {
-        val psiFile = createQiqFile(
-            project,
-            """
-            {{ foreach (${ '$'}items as ${ '$'}item): }}
-            <li>{{h ${ '$'}item->name }}</li>
-            {{ endforeach }}
-            """.trimIndent()
-        )
-
         val expected = """
-            <?php foreach (${ '$'}items as ${ '$'}item): ?><?= ${ '$'}item->name ?><?php endforeach; ?>
+            <?php foreach (${ '$'}items as ${ '$'}item): ?><?= \QiqRuntimeFunctions::h(${ '$'}item->name) ?><?php endforeach; ?>
             """.trimIndent()
 
         ApplicationManager.getApplication().runReadAction {
+            val psiFile = createQiqFile(
+                project,
+                """
+                {{ foreach (${ '$'}items as ${ '$'}item): }}
+                <li>{{h ${ '$'}item->name }}</li>
+                {{ endforeach }}
+                """.trimIndent()
+            )
             val hosts = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).toList()
             assertEquals(3, hosts.size, "Unexpected number of QiqCodeHost elements")
 
@@ -76,10 +75,52 @@ class QiqPhpInjectorTest {
         }
     }
 
-    private fun createQiqFile(project: Project, text: String): PsiFile {
-        return WriteAction.compute<PsiFile, RuntimeException> {
-            PsiFileFactory.getInstance(project).createFileFromText("sample.qiq", QiqFileType, text)
+    @Test
+    fun escapeDirectivesAreRoutedThroughRuntimeFunctions(project: Project) {
+        val cases = mapOf(
+            "h" to "<?= \\QiqRuntimeFunctions::h(",
+            "a" to "<?= \\QiqRuntimeFunctions::a(",
+            "j" to "<?= \\QiqRuntimeFunctions::j(",
+            "u" to "<?= \\QiqRuntimeFunctions::u(",
+            "c" to "<?= \\QiqRuntimeFunctions::c(",
+        )
+
+        ApplicationManager.getApplication().runReadAction {
+            for ((modifier, expectedPrefix) in cases) {
+                val psiFile = createQiqFile(project, "{{$modifier \$value }}")
+                val host = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).single()
+
+                val registrar = RecordingRegistrar()
+                injector.getLanguagesToInject(registrar, host)
+
+                val call = registrar.calls.single { it.language == PhpLanguage.INSTANCE }
+                assertEquals(expectedPrefix, call.prefix, "Wrong prefix for {{$modifier ... }}")
+                assertEquals(") ?>", call.suffix, "Wrong suffix for {{$modifier ... }}")
+            }
         }
+    }
+
+    @Test
+    fun rawDirectiveUsesPlainEchoTag(project: Project) {
+        ApplicationManager.getApplication().runReadAction {
+            val psiFile = createQiqFile(project, "{{= \$value }}")
+            val host = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).single()
+
+            val registrar = RecordingRegistrar()
+            injector.getLanguagesToInject(registrar, host)
+
+            val call = registrar.calls.single { it.language == PhpLanguage.INSTANCE }
+            assertEquals("<?= ", call.prefix, "{{= ... }} should keep the plain echo tag")
+            assertEquals(" ?>", call.suffix)
+        }
+    }
+
+    private fun createQiqFile(project: Project, text: String): PsiFile {
+        // In-memory PSI construction: no write lock required, and wrapping in
+        // WriteAction throws if the caller is already inside a ReadAction (which
+        // some test extensions enter implicitly).
+        return PsiFileFactory.getInstance(project)
+            .createFileFromText("sample.qiq", QiqFileType, text)
     }
 
     private fun assembleInjectedText(calls: List<RecordedCall>): String {

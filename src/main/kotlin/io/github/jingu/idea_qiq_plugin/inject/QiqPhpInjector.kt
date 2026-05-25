@@ -11,8 +11,10 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiLanguageInjectionHost
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.PhpLanguage
+import io.github.jingu.idea_qiq_plugin.lang.QiqTokenTypes
 import io.github.jingu.idea_qiq_plugin.psi.QiqCodeHost
 import io.github.jingu.idea_qiq_plugin.psi.QiqPhpHost
+import io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService
 import io.github.jingu.idea_qiq_plugin.util.QiqUtil
 import java.util.Locale
 
@@ -24,6 +26,13 @@ import java.util.Locale
 class QiqPhpInjector : MultiHostInjector, DumbAware {
 
     private val log = Logger.getInstance(QiqPhpInjector::class.java)
+
+    // Per-file dedup: emit the resolved stub selection once per file so that
+    // users (and bug reports) can verify which QiqRuntimeFunctions* class is
+    // being injected without scanning thousands of duplicate lines. Logged at
+    // debug level — enable `io.github.jingu.idea_qiq_plugin.inject.QiqPhpInjector`
+    // in Help > Diagnostic Tools > Debug Log Settings to surface it.
+    private val stubSelectionLogged = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     private data class InjectionPlan(
         val modificationStamp: Long,
@@ -118,18 +127,48 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         var injectionRange = range
 
         if (isPrintLike) {
+            // The current parser encodes the escape directive (h/a/j/u/c) in the
+            // element type and the lexer consumes the modifier byte as part of
+            // the opener, so the host text starts with the PHP expression and no
+            // strip is required. For legacy PSI shapes (ESCAPE_CONTENT) or hosts
+            // that reach isPrintLike() via QiqCodeHost's text-based fallback,
+            // the modifier may still be present in the text — in that case we
+            // detect it from the first character and strip it from the injection
+            // range so the inner expression is what gets passed to ::h() etc.
+            val elementTypeMethod = escapeMethodFromElementType(host)
             val firstChar = trimmedContent.first()
-            if (firstChar in setOf('=', 'h', 'j', 'a', 'u', 'c')) {
-                var newStart = range.startOffset + 1
-                while (newStart < range.endOffset && raw[newStart].isWhitespace()) {
-                    newStart++
-                }
-                if (newStart >= range.endOffset) return null
-                injectionRange = TextRange(newStart, range.endOffset)
-            }
 
-            prefix = "<?= "
-            suffix = " ?>"
+            when {
+                elementTypeMethod != null -> {
+                    // Modern PSI: parser already stripped the modifier.
+                    val runtimeClass = resolveRuntimeClass(host)
+                    prefix = "<?= \\$runtimeClass::$elementTypeMethod("
+                    suffix = ") ?>"
+                }
+                firstChar in ESCAPE_MODIFIER_CHARS -> {
+                    // Legacy / text-fallback: strip the modifier byte before
+                    // routing through QiqRuntimeFunctions*.
+                    val strippedStart = skipLeadingWhitespace(raw, range.startOffset + 1, range.endOffset)
+                        ?: return null
+                    injectionRange = TextRange(strippedStart, range.endOffset)
+                    val runtimeClass = resolveRuntimeClass(host)
+                    prefix = "<?= \\$runtimeClass::$firstChar("
+                    suffix = ") ?>"
+                }
+                firstChar == '=' -> {
+                    // {{= ... }}: raw echo, strip the `=` and emit a plain echo tag.
+                    val strippedStart = skipLeadingWhitespace(raw, range.startOffset + 1, range.endOffset)
+                        ?: return null
+                    injectionRange = TextRange(strippedStart, range.endOffset)
+                    prefix = "<?= "
+                    suffix = " ?>"
+                }
+                else -> {
+                    // Unclassified print-like host (e.g. bare `{{ $x }}`): plain echo.
+                    prefix = "<?= "
+                    suffix = " ?>"
+                }
+            }
         } else {
             val lower = trimmedContent.lowercase(Locale.ROOT)
 
@@ -146,6 +185,33 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         }
 
         return PhpInjectionFragment(host, injectionRange, prefix, suffix)
+    }
+
+    private fun resolveRuntimeClass(host: QiqCodeHost): String {
+        val vf = host.containingFile?.virtualFile ?: return DEFAULT_RUNTIME_CLASS
+        val major = QiqSettingsService.getInstance(host.project).resolveQiqMajorVersion(vf)
+        val runtimeClass = if (major == 1) STRICT_RUNTIME_CLASS else DEFAULT_RUNTIME_CLASS
+        // Guard add() behind isDebugEnabled so stubSelectionLogged does not grow
+        // unboundedly in production where debug logging is off.
+        if (log.isDebugEnabled && stubSelectionLogged.add(vf.path)) {
+            log.debug("Qiq stub selection: major=$major, class=$runtimeClass, file=${vf.path}")
+        }
+        return runtimeClass
+    }
+
+    private fun escapeMethodFromElementType(host: QiqCodeHost): Char? = when (host.node.elementType) {
+        QiqTokenTypes.ESCAPE_H_CONTENT -> 'h'
+        QiqTokenTypes.ESCAPE_A_CONTENT -> 'a'
+        QiqTokenTypes.ESCAPE_J_CONTENT -> 'j'
+        QiqTokenTypes.ESCAPE_U_CONTENT -> 'u'
+        QiqTokenTypes.ESCAPE_C_CONTENT -> 'c'
+        else -> null
+    }
+
+    private fun skipLeadingWhitespace(raw: String, from: Int, until: Int): Int? {
+        var i = from
+        while (i < until && raw[i].isWhitespace()) i++
+        return if (i >= until) null else i
     }
 
     private fun rewriteReservedDirective(raw: String, range: TextRange): ReservedDirectiveRewrite? {
@@ -180,4 +246,10 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
 
     override fun elementsToInjectIn(): List<Class<out PsiElement>> =
         listOf(QiqCodeHost::class.java, QiqPhpHost::class.java)
+
+    companion object {
+        private const val DEFAULT_RUNTIME_CLASS = "QiqRuntimeFunctions"
+        private const val STRICT_RUNTIME_CLASS = "QiqRuntimeFunctionsStrict"
+        private val ESCAPE_MODIFIER_CHARS = setOf('h', 'a', 'j', 'u', 'c')
+    }
 }

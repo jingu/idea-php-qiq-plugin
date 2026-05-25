@@ -10,7 +10,9 @@ import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import io.github.jingu.idea_qiq_plugin.util.QiqComposerVersionResolver
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 
 @Service(Service.Level.PROJECT)
@@ -33,6 +35,7 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
     override fun loadState(s: State) { state = s }
 
     companion object {
+        const val DEFAULT_MAJOR_VERSION = 3
         fun getInstance(project: Project) = project.getService(QiqSettingsService::class.java)
     }
 
@@ -50,10 +53,46 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
         return withFallback
     }
 
+    /**
+     * Returns the qiq/qiq major version declared in composer.lock for the
+     * content root that owns [contextFile]. Falls back to 3 when the lock
+     * file is missing, the package is not present, or the version string is
+     * unparseable (e.g. `dev-main`). The plugin uses this to decide which
+     * QiqRuntimeFunctions* stub class to route escape directives through:
+     *   - v1 → QiqRuntimeFunctionsStrict (string-only signatures)
+     *   - v2+ → QiqRuntimeFunctions (null|scalar|\Stringable signatures)
+     */
+    fun resolveQiqMajorVersion(contextFile: VirtualFile): Int {
+        val lockFile = findComposerLock(contextFile) ?: return DEFAULT_MAJOR_VERSION
+        val cached = composerLockCache[lockFile.path]
+        if (cached != null && cached.modificationStamp == lockFile.modificationStamp) {
+            return cached.majorVersion
+        }
+        val text = runCatching { VfsUtilCore.loadText(lockFile) }.getOrNull()
+            ?: return DEFAULT_MAJOR_VERSION
+        val parsed = QiqComposerVersionResolver.parseMajorVersion(text) ?: DEFAULT_MAJOR_VERSION
+        composerLockCache[lockFile.path] = ComposerLockEntry(lockFile.modificationStamp, parsed)
+        return parsed
+    }
+
+    private fun findComposerLock(contextFile: VirtualFile): VirtualFile? {
+        val contentRoot = ProjectFileIndex.getInstance(project).getContentRootForFile(contextFile)
+            ?: return null
+        return contentRoot.findChild("composer.lock")?.takeIf { it.isValid && !it.isDirectory }
+    }
+
+    private data class ComposerLockEntry(val modificationStamp: Long, val majorVersion: Int)
+    // ConcurrentHashMap: resolveQiqMajorVersion may be invoked from parallel
+    // ReadActions (e.g. concurrent PSI injection across files), so the cache
+    // backing store must tolerate concurrent put/get without map corruption.
+    private val composerLockCache = ConcurrentHashMap<String, ComposerLockEntry>()
+
     // ---- simple cache ----
 
     private data class CacheKey(val path: String)
-    private val cacheMap = mutableMapOf<CacheKey, List<VirtualFile>>()
+    // Same rationale as composerLockCache: resolveTemplateRoots is called
+    // from completion/navigation contributors running on parallel ReadActions.
+    private val cacheMap = ConcurrentHashMap<CacheKey, List<VirtualFile>>()
 
     private fun getCached(contextFile: VirtualFile): List<VirtualFile> =
         cacheMap[CacheKey(contextFile.path)] ?: emptyList()
