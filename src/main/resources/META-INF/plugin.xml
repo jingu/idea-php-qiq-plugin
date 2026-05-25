@@ -53,6 +53,15 @@
 
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
+
+        <!-- ElementManipulators: required for refactorings (Rename, Move, etc.)
+             to propagate edits made inside the injected PHP back to the Qiq host. -->
+        <lang.elementManipulator
+                forClass="io.github.jingu.idea_qiq_plugin.psi.QiqCodeHost"
+                implementationClass="io.github.jingu.idea_qiq_plugin.psi.QiqCodeHostManipulator"/>
+        <lang.elementManipulator
+                forClass="io.github.jingu.idea_qiq_plugin.psi.QiqPhpHost"
+                implementationClass="io.github.jingu.idea_qiq_plugin.psi.QiqPhpHostManipulator"/>
         <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
         <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
     </extensions>

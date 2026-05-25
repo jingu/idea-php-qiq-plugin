@@ -2,15 +2,17 @@ package io.github.jingu.idea_qiq_plugin.psi
 
 import com.intellij.extapi.psi.ASTWrapperPsiElement
 import com.intellij.lang.ASTNode
-import com.intellij.psi.PsiLanguageInjectionHost
-import com.intellij.psi.LiteralTextEscaper
 import com.intellij.openapi.util.TextRange
+import com.intellij.psi.ElementManipulators
+import com.intellij.psi.LiteralTextEscaper
+import com.intellij.psi.PsiLanguageInjectionHost
 
 class QiqPhpHost(node: ASTNode) : ASTWrapperPsiElement(node), PsiLanguageInjectionHost {
 
     override fun isValidHost(): Boolean = true
 
-    override fun updateText(text: String): PsiLanguageInjectionHost = this
+    override fun updateText(text: String): PsiLanguageInjectionHost =
+        ElementManipulators.handleContentChange(this, text)
 
     override fun createLiteralTextEscaper(): LiteralTextEscaper<QiqPhpHost> =
         object : LiteralTextEscaper<QiqPhpHost>(this) {
