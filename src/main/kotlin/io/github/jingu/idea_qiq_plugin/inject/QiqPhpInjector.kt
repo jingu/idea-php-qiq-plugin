@@ -127,33 +127,47 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         var injectionRange = range
 
         if (isPrintLike) {
-            // The parser strips the leading modifier byte (h/a/j/u/c/=) from the host
-            // text and encodes it in the element type instead, so derive the directive
-            // from the element type. Defensive fallback to the first character handles
-            // legacy PSI shapes (text-based kind detection in QiqCodeHost).
-            val escapeMethod = escapeMethodFor(host)
+            // The current parser encodes the escape directive (h/a/j/u/c) in the
+            // element type and the lexer consumes the modifier byte as part of
+            // the opener, so the host text starts with the PHP expression and no
+            // strip is required. For legacy PSI shapes (ESCAPE_CONTENT) or hosts
+            // that reach isPrintLike() via QiqCodeHost's text-based fallback,
+            // the modifier may still be present in the text — in that case we
+            // detect it from the first character and strip it from the injection
+            // range so the inner expression is what gets passed to ::h() etc.
+            val elementTypeMethod = escapeMethodFromElementType(host)
+            val firstChar = trimmedContent.first()
 
-            if (escapeMethod != null) {
-                // Route escape directives through QiqRuntimeFunctions* so that
-                // PhpStorm validates the argument against the PHPDoc signature.
-                // The runtime class is picked based on the qiq/qiq major
-                // version detected in composer.lock: v1 has string-only
-                // signatures, while v2+ accept null|scalar|\Stringable.
-                val runtimeClass = resolveRuntimeClass(host)
-                prefix = "<?= \\$runtimeClass::$escapeMethod("
-                suffix = ") ?>"
-            } else {
-                // {{= ... }} or unclassified print-like host: emit a plain echo tag.
-                if (trimmedContent.first() == '=') {
-                    var newStart = range.startOffset + 1
-                    while (newStart < range.endOffset && raw[newStart].isWhitespace()) {
-                        newStart++
-                    }
-                    if (newStart >= range.endOffset) return null
-                    injectionRange = TextRange(newStart, range.endOffset)
+            when {
+                elementTypeMethod != null -> {
+                    // Modern PSI: parser already stripped the modifier.
+                    val runtimeClass = resolveRuntimeClass(host)
+                    prefix = "<?= \\$runtimeClass::$elementTypeMethod("
+                    suffix = ") ?>"
                 }
-                prefix = "<?= "
-                suffix = " ?>"
+                firstChar in ESCAPE_MODIFIER_CHARS -> {
+                    // Legacy / text-fallback: strip the modifier byte before
+                    // routing through QiqRuntimeFunctions*.
+                    val strippedStart = skipLeadingWhitespace(raw, range.startOffset + 1, range.endOffset)
+                        ?: return null
+                    injectionRange = TextRange(strippedStart, range.endOffset)
+                    val runtimeClass = resolveRuntimeClass(host)
+                    prefix = "<?= \\$runtimeClass::$firstChar("
+                    suffix = ") ?>"
+                }
+                firstChar == '=' -> {
+                    // {{= ... }}: raw echo, strip the `=` and emit a plain echo tag.
+                    val strippedStart = skipLeadingWhitespace(raw, range.startOffset + 1, range.endOffset)
+                        ?: return null
+                    injectionRange = TextRange(strippedStart, range.endOffset)
+                    prefix = "<?= "
+                    suffix = " ?>"
+                }
+                else -> {
+                    // Unclassified print-like host (e.g. bare `{{ $x }}`): plain echo.
+                    prefix = "<?= "
+                    suffix = " ?>"
+                }
             }
         } else {
             val lower = trimmedContent.lowercase(Locale.ROOT)
@@ -177,19 +191,27 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         val vf = host.containingFile?.virtualFile ?: return DEFAULT_RUNTIME_CLASS
         val major = QiqSettingsService.getInstance(host.project).resolveQiqMajorVersion(vf)
         val runtimeClass = if (major == 1) STRICT_RUNTIME_CLASS else DEFAULT_RUNTIME_CLASS
-        if (stubSelectionLogged.add(vf.path) && log.isDebugEnabled) {
+        // Guard add() behind isDebugEnabled so stubSelectionLogged does not grow
+        // unboundedly in production where debug logging is off.
+        if (log.isDebugEnabled && stubSelectionLogged.add(vf.path)) {
             log.debug("Qiq stub selection: major=$major, class=$runtimeClass, file=${vf.path}")
         }
         return runtimeClass
     }
 
-    private fun escapeMethodFor(host: QiqCodeHost): Char? = when (host.node.elementType) {
+    private fun escapeMethodFromElementType(host: QiqCodeHost): Char? = when (host.node.elementType) {
         QiqTokenTypes.ESCAPE_H_CONTENT -> 'h'
         QiqTokenTypes.ESCAPE_A_CONTENT -> 'a'
         QiqTokenTypes.ESCAPE_J_CONTENT -> 'j'
         QiqTokenTypes.ESCAPE_U_CONTENT -> 'u'
         QiqTokenTypes.ESCAPE_C_CONTENT -> 'c'
         else -> null
+    }
+
+    private fun skipLeadingWhitespace(raw: String, from: Int, until: Int): Int? {
+        var i = from
+        while (i < until && raw[i].isWhitespace()) i++
+        return if (i >= until) null else i
     }
 
     private fun rewriteReservedDirective(raw: String, range: TextRange): ReservedDirectiveRewrite? {
@@ -228,5 +250,6 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
     companion object {
         private const val DEFAULT_RUNTIME_CLASS = "QiqRuntimeFunctions"
         private const val STRICT_RUNTIME_CLASS = "QiqRuntimeFunctionsStrict"
+        private val ESCAPE_MODIFIER_CHARS = setOf('h', 'a', 'j', 'u', 'c')
     }
 }
