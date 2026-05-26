@@ -62,6 +62,12 @@
         <lang.elementManipulator
                 forClass="io.github.jingu.idea_qiq_plugin.psi.QiqPhpHost"
                 implementationClass="io.github.jingu.idea_qiq_plugin.psi.QiqPhpHostManipulator"/>
+
+        <!-- Forward Shift+F6 inside a Qiq injection host to the injected
+             PHP rename pipeline (the default handler only sees the outer
+             unnamed Qiq host and disables the action). -->
+        <renameHandler
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqInjectedRenameHandler"/>
         <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
         <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
     </extensions>
