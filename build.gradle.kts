@@ -58,7 +58,15 @@ intellijPlatform {
             sinceBuild.set("241")
             untilBuild.set("261.*")
         }
-        description.set("Syntax highlighting and simple navigation for Qiq templates")
+        description.set(
+            "Qiq template support for PhpStorm: HTML-aware syntax highlighting, full PHP " +
+                "injection inside Qiq tags and inline <?php ?> blocks, cross-template rename " +
+                "refactoring (Shift+F6 works both from PHP and from inside templates), and " +
+                "type-checked escape directives — wrong types passed to {{h }}, {{a }}, " +
+                "{{j }}, {{u }}, {{c }} are flagged at edit time by PhpStorm's own Type " +
+                "Compatibility inspection, with strict / relaxed signatures auto-selected " +
+                "from composer.lock."
+        )
         vendor {
             name.set("Yoshitaka Jingu")
             url.set("https://github.com/jingu/idea-php-qiq-plugin")
