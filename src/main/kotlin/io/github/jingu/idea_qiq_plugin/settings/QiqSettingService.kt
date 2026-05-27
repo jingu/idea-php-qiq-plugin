@@ -26,7 +26,13 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
         var candidateExtensions: MutableList<String> = mutableListOf(".qiq.php", ".qiq", ".php"),
         var maxAscendDepth: Int = 8,
         var maxFilesPerDir: Int = 400,
-        var maxBytesPerFile: Int = 8192
+        var maxBytesPerFile: Int = 8192,
+        // When true, QiqPhpInjector prepends `<?php declare(strict_types=1); ?>`
+        // to each Qiq file's injected PHP so that scalar literal misuses in
+        // escape directives (e.g. `{{h true }}`, `{{h 123 }}`) surface as
+        // PhpStorm type warnings. Off by default to match Qiq's runtime
+        // behaviour, which performs implicit scalar→string casts.
+        var enableStrictTypes: Boolean = false
     )
 
     private var state = State()
@@ -37,6 +43,13 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
     companion object {
         const val DEFAULT_MAJOR_VERSION = 3
         fun getInstance(project: Project) = project.getService(QiqSettingsService::class.java)
+    }
+
+    /** Whether strict_types should be injected into Qiq template PHP fragments. */
+    fun isStrictTypesEnabled(): Boolean = state.enableStrictTypes
+
+    fun setStrictTypesEnabled(enabled: Boolean) {
+        state.enableStrictTypes = enabled
     }
 
 

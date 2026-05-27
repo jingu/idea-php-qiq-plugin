@@ -68,6 +68,14 @@
              unnamed Qiq host and disables the action). -->
         <renameHandler
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqInjectedRenameHandler"/>
+
+        <!-- Settings > Languages & Frameworks > Qiq Templates -->
+        <projectConfigurable
+                parentId="language"
+                instance="io.github.jingu.idea_qiq_plugin.settings.QiqProjectConfigurable"
+                id="settings.qiq"
+                key="settings.qiq.display.name"
+                bundle="messages.QiqBundle"/>
         <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
         <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
     </extensions>

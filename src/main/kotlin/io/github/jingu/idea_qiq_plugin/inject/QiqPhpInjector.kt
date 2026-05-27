@@ -36,6 +36,10 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
 
     private data class InjectionPlan(
         val modificationStamp: Long,
+        // Project-level setting that affects the plan must be part of the
+        // cache key — otherwise toggling the setting on an already-open
+        // file would return a stale plan until the next edit/reparse.
+        val strictTypesEnabled: Boolean,
         val fragments: List<PhpInjectionFragment>
     )
 
@@ -62,16 +66,41 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
     }
 
     private fun ensureInjectionPlan(file: PsiFile, modificationStamp: Long): InjectionPlan {
+        val strictTypesEnabled = QiqSettingsService.getInstance(file.project).isStrictTypesEnabled()
         val existing = file.getUserData(injectionPlanKey)
-        if (existing != null && existing.modificationStamp == modificationStamp) {
+        if (existing != null &&
+            existing.modificationStamp == modificationStamp &&
+            existing.strictTypesEnabled == strictTypesEnabled
+        ) {
             return existing
         }
 
         val injectionHosts = collectInjectionHosts(file)
-        val fragments = injectionHosts.mapNotNull { buildInjectionFragment(it) }
-        val plan = InjectionPlan(modificationStamp, fragments)
+        val rawFragments = injectionHosts.mapNotNull { buildInjectionFragment(it) }
+        val fragments = applyStrictTypesPrelude(rawFragments, strictTypesEnabled)
+        val plan = InjectionPlan(modificationStamp, strictTypesEnabled, fragments)
         file.putUserData(injectionPlanKey, plan)
         return plan
+    }
+
+    /**
+     * When the project setting "Strict Types" is on, prepend
+     * `<?php declare(strict_types=1); ?>` to the first injection fragment.
+     * IntelliJ assembles the virtual injected PHP file by concatenating
+     * fragment prefixes / hosts / suffixes in order, so a `declare`
+     * statement at the head of the first prefix makes the entire virtual
+     * file run under strict mode. This surfaces scalar→string mismatches
+     * such as `{{h true }}` or `{{h 123 }}` as PhpStorm warnings.
+     */
+    private fun applyStrictTypesPrelude(
+        fragments: List<PhpInjectionFragment>,
+        enabled: Boolean,
+    ): List<PhpInjectionFragment> {
+        if (!enabled || fragments.isEmpty()) return fragments
+        val first = fragments.first()
+        val prelude = "<?php declare(strict_types=1); ?>"
+        val newFirst = first.copy(prefix = prelude + (first.prefix.orEmpty()))
+        return listOf(newFirst) + fragments.drop(1)
     }
 
     private fun collectInjectionHosts(file: PsiFile): List<PsiLanguageInjectionHost> {
