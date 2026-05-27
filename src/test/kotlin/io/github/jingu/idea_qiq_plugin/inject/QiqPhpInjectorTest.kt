@@ -181,6 +181,41 @@ class QiqPhpInjectorTest {
     }
 
     @Test
+    fun togglingStrictTypesSettingInvalidatesCachedInjectionPlan(project: Project) {
+        val settings = io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService.getInstance(project)
+        val previous = settings.isStrictTypesEnabled()
+        try {
+            ApplicationManager.getApplication().runReadAction {
+                val psiFile = createQiqFile(project, "{{h \$value }}")
+                val host = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).single()
+
+                // First pass with the setting OFF: prelude must be absent.
+                settings.setStrictTypesEnabled(false)
+                val off = RecordingRegistrar().also { injector.getLanguagesToInject(it, host) }
+                assert(!off.calls.single { it.language == PhpLanguage.INSTANCE }.prefix.orEmpty()
+                    .contains("declare(strict_types"))
+
+                // Toggle ON without editing the file: prelude must appear
+                // even though the modificationStamp is unchanged. Regression
+                // test for the cache key originally including only the
+                // modification stamp.
+                settings.setStrictTypesEnabled(true)
+                val on = RecordingRegistrar().also { injector.getLanguagesToInject(it, host) }
+                assert(on.calls.single { it.language == PhpLanguage.INSTANCE }.prefix.orEmpty()
+                    .startsWith("<?php declare(strict_types=1); ?>"))
+
+                // Toggle OFF again: prelude must disappear.
+                settings.setStrictTypesEnabled(false)
+                val offAgain = RecordingRegistrar().also { injector.getLanguagesToInject(it, host) }
+                assert(!offAgain.calls.single { it.language == PhpLanguage.INSTANCE }.prefix.orEmpty()
+                    .contains("declare(strict_types"))
+            }
+        } finally {
+            settings.setStrictTypesEnabled(previous)
+        }
+    }
+
+    @Test
     fun rawDirectiveUsesPlainEchoTag(project: Project) {
         ApplicationManager.getApplication().runReadAction {
             val psiFile = createQiqFile(project, "{{= \$value }}")

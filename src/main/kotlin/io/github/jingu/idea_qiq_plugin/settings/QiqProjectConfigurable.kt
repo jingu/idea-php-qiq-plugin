@@ -26,8 +26,15 @@ class QiqProjectConfigurable(private val project: Project) : BoundSearchableConf
 
     override fun createPanel(): DialogPanel = panel {
         row {
+            // Bind through the public service accessors rather than the
+            // backing `state` property, which is private. Using accessors
+            // also keeps the configurable independent of the persistent
+            // state's storage shape.
             checkBox(QiqBundle.message("settings.qiq.strict.types.checkbox"))
-                .bindSelected(settings.state::enableStrictTypes)
+                .bindSelected(
+                    { settings.isStrictTypesEnabled() },
+                    { settings.setStrictTypesEnabled(it) },
+                )
                 .comment(QiqBundle.message("settings.qiq.strict.types.comment"))
         }
     }
