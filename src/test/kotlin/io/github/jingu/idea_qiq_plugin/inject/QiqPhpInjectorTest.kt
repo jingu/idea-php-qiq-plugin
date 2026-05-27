@@ -101,6 +101,86 @@ class QiqPhpInjectorTest {
     }
 
     @Test
+    fun strictTypesPreludeIsAbsentByDefault(project: Project) {
+        ApplicationManager.getApplication().runReadAction {
+            val psiFile = createQiqFile(project, "{{h \$value }}")
+            val host = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).single()
+
+            val registrar = RecordingRegistrar()
+            injector.getLanguagesToInject(registrar, host)
+
+            val call = registrar.calls.single { it.language == PhpLanguage.INSTANCE }
+            val prefix = call.prefix.orEmpty()
+            assert(!prefix.contains("declare(strict_types")) {
+                "Expected no strict_types prelude by default, got prefix='$prefix'"
+            }
+        }
+    }
+
+    @Test
+    fun strictTypesPreludeIsPrependedWhenEnabled(project: Project) {
+        val settings = io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService.getInstance(project)
+        val previous = settings.isStrictTypesEnabled()
+        settings.setStrictTypesEnabled(true)
+        try {
+            ApplicationManager.getApplication().runReadAction {
+                val psiFile = createQiqFile(project, "{{h \$value }}")
+                val host = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).single()
+
+                val registrar = RecordingRegistrar()
+                injector.getLanguagesToInject(registrar, host)
+
+                val call = registrar.calls.single { it.language == PhpLanguage.INSTANCE }
+                val prefix = call.prefix.orEmpty()
+                assert(prefix.startsWith("<?php declare(strict_types=1); ?>")) {
+                    "Expected strict_types prelude to be prepended, got prefix='$prefix'"
+                }
+                // The existing escape-routing prefix must still be present after
+                // the prelude so the directive type information is preserved.
+                assert(prefix.contains("QiqRuntimeFunctions") && prefix.endsWith("h(")) {
+                    "Original escape prefix should follow the prelude, got prefix='$prefix'"
+                }
+            }
+        } finally {
+            settings.setStrictTypesEnabled(previous)
+        }
+    }
+
+    @Test
+    fun strictTypesPreludeOnlyTouchesFirstFragment(project: Project) {
+        val settings = io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService.getInstance(project)
+        val previous = settings.isStrictTypesEnabled()
+        settings.setStrictTypesEnabled(true)
+        try {
+            ApplicationManager.getApplication().runReadAction {
+                val psiFile = createQiqFile(
+                    project,
+                    """
+                    {{ foreach (${ '$'}items as ${ '$'}item): }}
+                    <li>{{h ${ '$'}item->name }}</li>
+                    {{ endforeach }}
+                    """.trimIndent(),
+                )
+                val hosts = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).toList()
+                val registrar = RecordingRegistrar()
+                injector.getLanguagesToInject(registrar, hosts.first())
+
+                val phpCalls = registrar.calls.filter { it.language == PhpLanguage.INSTANCE }
+                assertEquals(3, phpCalls.size, "Expected 3 PHP fragments")
+
+                val preludeMarker = "declare(strict_types=1)"
+                val withPrelude = phpCalls.count { it.prefix.orEmpty().contains(preludeMarker) }
+                assertEquals(1, withPrelude, "Strict types prelude must appear in exactly one fragment")
+                assert(phpCalls.first().prefix.orEmpty().contains(preludeMarker)) {
+                    "Prelude must be on the FIRST fragment"
+                }
+            }
+        } finally {
+            settings.setStrictTypesEnabled(previous)
+        }
+    }
+
+    @Test
     fun rawDirectiveUsesPlainEchoTag(project: Project) {
         ApplicationManager.getApplication().runReadAction {
             val psiFile = createQiqFile(project, "{{= \$value }}")
