@@ -40,6 +40,8 @@
         <lang.commenter
                 language="Qiq"
                 implementationClass="io.github.jingu.idea_qiq_plugin.editor.QiqCommenter"/>
+        <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
+        <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
 
         <!-- Color Settings Page -->
         <colorSettingsPage implementation="io.github.jingu.idea_qiq_plugin.ui.QiqColorSettingsPage"/>
@@ -76,8 +78,6 @@
                 id="settings.qiq"
                 key="settings.qiq.display.name"
                 bundle="messages.QiqBundle"/>
-        <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
-        <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
     </extensions>
 
     <!-- PHP ライブラリスタブの登録（任意） -->
@@ -93,9 +93,21 @@
     </actions>
     <change-notes><![CDATA[
 <ul>
-  <li><b>PhpStorm 2026.1 Support</b>
+  <li><b>Type-aware escape directives</b>
     <ul>
-      <li>Extended compatibility to PhpStorm 2026.1 (build 261).</li>
+      <li><code>{{h }}</code>, <code>{{a }}</code>, <code>{{j }}</code>, <code>{{u }}</code>, <code>{{c }}</code> are routed through typed runtime stubs so PhpStorm flags wrong argument types (arrays, objects without <code>__toString</code>, etc.).</li>
+      <li>The strict (Qiq 1.x) or relaxed (Qiq 2.x / 3.x) escape signature is selected automatically from <code>composer.lock</code>.</li>
+    </ul>
+  </li>
+  <li><b>Cross-template rename refactoring</b>
+    <ul>
+      <li>Renaming a PHP property, method, or local variable now propagates into Qiq template references.</li>
+      <li>Shift+F6 triggered from inside a Qiq template (e.g. on <code>title</code> in <code>{{h $article-&gt;title }}</code>) opens the rename dialog and updates both the PHP declaration and every template usage.</li>
+    </ul>
+  </li>
+  <li><b>Strict Types setting</b>
+    <ul>
+      <li>New project setting under <i>Settings &gt; Languages &amp; Frameworks &gt; Qiq Templates</i> that injects <code>declare(strict_types=1)</code> into Qiq templates so scalar literal misuses such as <code>{{h true }}</code> or <code>{{h 123 }}</code> surface as type warnings. Off by default.</li>
     </ul>
   </li>
 </ul>

@@ -9,9 +9,18 @@ Qiq Templates Support is an IntelliJ-based plugin that brings syntax highlightin
 
 - **Syntax highlighting** for Qiq control structures, escape modifiers (`{{= }}`, `{{h }}`, etc.), and HTML blocks.
 - **PHP language injection** inside Qiq tokens and inline `<?php ?>` islands so that autocompletion, inspections, and formatting work as expected.
+- **Type-aware escape directives**: `{{h }}`, `{{a }}`, `{{j }}`, `{{u }}`, `{{c }}` are routed through typed runtime stubs so PhpStorm flags wrong argument types (`{{h $array }}`, `{{h $objectWithoutToString }}`, etc.).
+- **Composer-aware stub selection**: the strict (Qiq 1.x) or relaxed (Qiq 2.x / 3.x) escape signature is chosen automatically from `composer.lock`.
+- **Cross-template rename refactoring**: renaming a PHP property, method, or local variable propagates into every Qiq template that references it. Triggering Shift+F6 from inside a Qiq template (`{{h $article->title }}`) also works.
 - **Cross-template navigation**: Cmd/Ctrl+click (Go to Declaration) on `setLayout()`, `render()`, `include()`, or custom helpers to open the referenced template file.
 - **Enter/typing handlers** that auto-complete Qiq block closers and keep indentation consistent.
 - **Template discovery**: resolves relative paths by walking up from the current file, project roots, and PHP server document roots.
+
+## Settings
+
+Open **Settings (Preferences) → Languages & Frameworks → Qiq Templates** for project-level options:
+
+- **Inject `declare(strict_types=1)` into Qiq templates** *(off by default)* — when enabled, scalar literal misuses such as `{{h true }}`, `{{h 123 }}`, or `{{h null }}` surface as PhpStorm type warnings. Useful when your project renders templates under PHP strict types; off by default to match Qiq's runtime, which performs implicit scalar→string casts.
 
 ## Installation
 

@@ -53,7 +53,7 @@ intellijPlatform {
     pluginConfiguration {
         name.set("Qiq Templates Support")
         id.set("io.github.jingu.idea-qiq-plugin")
-        version.set("0.5.0")
+        version.set("0.6.0")
         ideaVersion {
             sinceBuild.set("241")
             untilBuild.set("261.*")
