@@ -12,7 +12,10 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.PsiElement
 import com.intellij.util.ProcessingContext
+import com.jetbrains.php.lang.psi.elements.ConstantReference
 import com.jetbrains.php.lang.psi.elements.FunctionReference
+import com.jetbrains.php.lang.psi.elements.MemberReference
+import com.jetbrains.php.lang.psi.elements.Variable
 import io.github.jingu.idea_qiq_plugin.helper.QiqHelperRegistry
 import io.github.jingu.idea_qiq_plugin.helper.QiqHelpersClassResolver
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
@@ -50,11 +53,7 @@ class QiqHelperCompletionContributor : CompletionContributor() {
             val position = parameters.position
             if (!QiqInjectionSupport.isInQiqFile(position)) return
 
-            // Only at a function/method call *name* position. The dummy
-            // identifier inserted by completion keeps the enclosing reference,
-            // so the leaf's parent is the (incomplete) FunctionReference /
-            // MethodReference (the latter extends FunctionReference).
-            if (position.parent !is FunctionReference) return
+            if (!isHelperCallNamePosition(position.parent)) return
 
             val project = position.project
             val names = LinkedHashSet<String>().apply {
@@ -73,7 +72,25 @@ class QiqHelperCompletionContributor : CompletionContributor() {
         }
     }
 
-    private companion object {
+    companion object {
+        /**
+         * A helper is invoked either as a bare call/name (`{{ helper| }}`,
+         * which is a [ConstantReference] before the `(` is typed and a
+         * [FunctionReference] after) or on `$this` (`{{ $this->helper| }}`).
+         * Member references on any other qualifier (e.g. `$article->title`)
+         * are not helpers, so they are excluded to avoid noise.
+         *
+         * Order matters: [com.jetbrains.php.lang.psi.elements.MethodReference]
+         * is both a MemberReference and a FunctionReference, so the
+         * MemberReference branch (with the `$this` check) must come first.
+         */
+        fun isHelperCallNamePosition(parent: PsiElement?): Boolean = when (parent) {
+            is MemberReference -> (parent.classReference as? Variable)?.name == "this"
+            is FunctionReference -> true
+            is ConstantReference -> true
+            else -> false
+        }
+
         // Append `()` and place the caret between the parentheses, unless the
         // call already has an opening paren (e.g. re-completing an existing
         // call). Mirrors how PhpStorm completes function calls.
