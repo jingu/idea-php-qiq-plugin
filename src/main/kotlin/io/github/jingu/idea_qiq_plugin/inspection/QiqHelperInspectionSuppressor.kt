@@ -6,6 +6,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.elements.FunctionReference
 import io.github.jingu.idea_qiq_plugin.helper.QiqHelperRegistry
+import io.github.jingu.idea_qiq_plugin.helper.QiqHelpersClassResolver
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
 
 /**
@@ -37,7 +38,11 @@ class QiqHelperInspectionSuppressor : InspectionSuppressor {
         if (!QiqInjectionSupport.isInQiqFile(call)) return false
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return false
-        return QiqHelperRegistry.getInstance(element.project).resolveFqn(name) != null
+        val project = element.project
+        // Suppress for either resolution path: 1.x HelperLocator registration
+        // or a 2.x/3.x Qiq\Helpers subclass method.
+        return QiqHelperRegistry.getInstance(project).resolveFqn(name) != null ||
+            QiqHelpersClassResolver.getInstance(project).hasHelper(name)
     }
 
     override fun getSuppressActions(element: PsiElement?, toolId: String): Array<SuppressQuickFix> =

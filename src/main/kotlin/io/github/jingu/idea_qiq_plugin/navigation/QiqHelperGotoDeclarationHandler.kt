@@ -8,6 +8,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.elements.FunctionReference
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import io.github.jingu.idea_qiq_plugin.helper.QiqHelperRegistry
+import io.github.jingu.idea_qiq_plugin.helper.QiqHelpersClassResolver
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
 
 /**
@@ -48,15 +49,23 @@ class QiqHelperGotoDeclarationHandler : GotoDeclarationHandler {
         if (!QiqInjectionSupport.isInQiqFile(call)) return null
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return null
-        val classes = QiqHelperRegistry.getInstance(call.project).resolveClasses(name)
-        if (log.isDebugEnabled) {
-            log.debug("Qiq helper goto: name='$name' resolvedClasses=${classes.size}")
-        }
-        if (classes.isEmpty()) return null
+        val project = call.project
 
+        // 1.x HelperLocator style: name -> invokable Qiq\Helper\<X> class.
+        val classes = QiqHelperRegistry.getInstance(project).resolveClasses(name)
+        // 2.x/3.x style: name -> public method on a Qiq\Helpers subclass.
+        val methods = QiqHelpersClassResolver.getInstance(project).resolve(name)
+
+        if (log.isDebugEnabled) {
+            log.debug("Qiq helper goto: name='$name' locatorClasses=${classes.size} helperMethods=${methods.size}")
+        }
+        if (classes.isEmpty() && methods.isEmpty()) return null
+
+        val targets = mutableListOf<PsiElement>()
         // Prefer the __invoke method — the actual call target Qiq dispatches
         // to — falling back to the class declaration when none is declared.
-        val targets = classes.map { phpClass -> invokeMethodOf(phpClass) ?: phpClass }
+        classes.forEach { phpClass -> targets.add(invokeMethodOf(phpClass) ?: phpClass) }
+        targets.addAll(methods)
         return targets.toTypedArray()
     }
 
