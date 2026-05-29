@@ -84,6 +84,13 @@
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqHelperCompletionContributor"/>
 
+        <!-- Complete template paths in setLayout()/render()/extends()/include()
+             arguments, listing files under the resolved template roots with the
+             Qiq extension stripped. Pairs with the path Go to Declaration. -->
+        <completion.contributor
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqTemplatePathCompletionContributor"/>
+
         <!-- ElementManipulators: required for refactorings (Rename, Move, etc.)
              to propagate edits made inside the injected PHP back to the Qiq host. -->
         <lang.elementManipulator
