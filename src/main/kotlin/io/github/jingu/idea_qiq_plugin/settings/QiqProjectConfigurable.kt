@@ -86,7 +86,7 @@ class QiqProjectConfigurable(private val project: Project) : BoundSearchableConf
     private fun chooseBootstrapFiles() {
         val descriptor = FileChooserDescriptorFactory.createMultipleFilesNoJarsDescriptor()
             .withTitle(QiqBundle.message("settings.qiq.helper.bootstrap.chooser.title"))
-            .withFileFilter { it.extension.equals("php", ignoreCase = true) }
+            .withFileFilter { "php".equals(it.extension, ignoreCase = true) }
 
         val toSelect = project.basePath?.let { com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(it) }
         FileChooser.chooseFiles(descriptor, project, toSelect) { files ->

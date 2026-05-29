@@ -209,6 +209,84 @@ class QiqHelperRegistryTest {
     }
 
     @Test
+    fun ignoresNewExpressionNestedInsideReturnedCall(project: Project) {
+        // `return foo(new Inner())` returns foo()'s result, not Inner — the
+        // scanner must not index 'wrap' as returning Inner.
+        val map = scan(
+            project,
+            """
+            <?php
+            namespace App;
+
+            use Qiq\HelperLocator;
+            use Qiq\Helper\Inner;
+
+            class Bootstrap
+            {
+                public function build(HelperLocator ${'$'}locator, ${'$'}svc): void
+                {
+                    ${'$'}locator->set('wrap', static function () use (${'$'}svc) {
+                        return ${'$'}svc->make(new Inner());
+                    });
+                }
+            }
+            """.trimIndent(),
+        )
+        assertEquals(0, map.size, "new nested in a returned call must not be indexed, got: $map")
+    }
+
+    @Test
+    fun ignoresNewExpressionThatIsNotTheReturnedValue(project: Project) {
+        // A `new` assigned to a local but not returned must not be indexed.
+        val map = scan(
+            project,
+            """
+            <?php
+            namespace App;
+
+            use Qiq\HelperLocator;
+            use Qiq\Helper\Tmp;
+
+            class Bootstrap
+            {
+                public function build(HelperLocator ${'$'}locator, ${'$'}svc): void
+                {
+                    ${'$'}locator->set('proxy', static function () use (${'$'}svc) {
+                        ${'$'}tmp = new Tmp();
+                        return ${'$'}svc->make();
+                    });
+                }
+            }
+            """.trimIndent(),
+        )
+        assertEquals(0, map.size, "non-returned new must not be indexed, got: $map")
+    }
+
+    @Test
+    fun ignoresNewExpressionNestedInsideArrowReturnedCall(project: Project) {
+        // `fn () => foo(new Inner())` — Inner is not the arrow's value.
+        val map = scan(
+            project,
+            """
+            <?php
+            namespace App;
+
+            use Qiq\HelperLocator;
+            use Qiq\Helper\Inner;
+
+            class Bootstrap
+            {
+                public function build(HelperLocator ${'$'}locator, ${'$'}svc): void
+                {
+                    ${'$'}locator->set('wrap', static fn () => ${'$'}svc->make(new Inner()));
+                }
+            }
+            """.trimIndent(),
+        )
+        assertEquals(0, map.size, "new nested in an arrow's returned call must not be indexed, got: $map")
+    }
+
+    @Test
     fun extractsMultipleRegistrationsFromProviderStyleFile(project: Project) {
         val map = scan(
             project,

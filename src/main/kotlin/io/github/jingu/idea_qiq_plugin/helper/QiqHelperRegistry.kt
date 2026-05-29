@@ -3,7 +3,6 @@ package io.github.jingu.idea_qiq_plugin.helper
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
@@ -189,19 +188,22 @@ class QiqHelperRegistry(private val project: Project) {
     }
 
     private fun bodyNewExpressionFqn(func: Function): String? {
+        // Regular closures: a `return new X(...)` whose returned value is
+        // *directly* a new-expression. Checking the return argument (not any
+        // descendant) avoids matching `return foo(new X())` or
+        // `return $svc->make(new X())`, which do not return X.
         val returns = PsiTreeUtil.findChildrenOfType(func, PhpReturn::class.java)
             .filter { PsiTreeUtil.getParentOfType(it, Function::class.java) === func }
         for (ret in returns) {
-            val new = PsiTreeUtil.findChildOfType(ret, NewExpression::class.java) ?: continue
-            classRefFqn(new.classReference)?.let { return it }
+            (ret.argument as? NewExpression)?.let { new ->
+                classRefFqn(new.classReference)?.let { return it }
+            }
         }
 
-        // Arrow functions: no PhpReturn — the body expression itself is the
-        // value. Search shallowly within the function for a NewExpression
-        // whose nearest enclosing Function is this arrow function.
-        val arrowNews = PsiTreeUtil.findChildrenOfType(func, NewExpression::class.java)
-            .filter { PsiTreeUtil.getParentOfType(it, Function::class.java) === func }
-        for (new in arrowNews) {
+        // Arrow functions (`fn () => new X(...)`): no PhpReturn — the body
+        // expression is the value. Only a *direct* child new-expression
+        // counts, so `fn () => foo(new X())` is not matched.
+        PsiTreeUtil.getChildOfType(func, NewExpression::class.java)?.let { new ->
             classRefFqn(new.classReference)?.let { return it }
         }
         return null
