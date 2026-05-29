@@ -174,9 +174,22 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
                     prefix = "<?= \\$runtimeClass::$elementTypeMethod("
                     suffix = ") ?>"
                 }
-                firstChar in ESCAPE_MODIFIER_CHARS -> {
-                    // Legacy / text-fallback: strip the modifier byte before
-                    // routing through QiqRuntimeFunctions*.
+                host.node.elementType == QiqTokenTypes.RAW_CONTENT -> {
+                    // {{= ... }}: the lexer consumed the `=` opener, so the
+                    // content is already the expression. Emit a plain echo
+                    // without touching the leading byte — critical for helper
+                    // names that happen to start with an escape-modifier
+                    // letter (asset/currentUrl/upper → a/c/u), which must NOT
+                    // be mistaken for the {{a }}/{{c }}/{{u }} directives.
+                    prefix = "<?= "
+                    suffix = " ?>"
+                }
+                isStandaloneEscapeModifier(trimmedContent) -> {
+                    // Legacy / text-fallback: a single escape-modifier byte
+                    // followed by whitespace (e.g. "h $x"). Strip it and route
+                    // through QiqRuntimeFunctions*. The whitespace requirement
+                    // prevents `asset(...)` ('a' + 's') from being treated as
+                    // the `{{a }}` directive.
                     val strippedStart = skipLeadingWhitespace(raw, range.startOffset + 1, range.endOffset)
                         ?: return null
                     injectionRange = TextRange(strippedStart, range.endOffset)
@@ -185,7 +198,8 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
                     suffix = ") ?>"
                 }
                 firstChar == '=' -> {
-                    // {{= ... }}: raw echo, strip the `=` and emit a plain echo tag.
+                    // Legacy {{= ... }} shape where the `=` is still in the
+                    // content: strip it and emit a plain echo tag.
                     val strippedStart = skipLeadingWhitespace(raw, range.startOffset + 1, range.endOffset)
                         ?: return null
                     injectionRange = TextRange(strippedStart, range.endOffset)
@@ -236,6 +250,16 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
         QiqTokenTypes.ESCAPE_C_CONTENT -> 'c'
         else -> null
     }
+
+    /**
+     * True when [content] begins with a genuine standalone escape modifier:
+     * a single `h`/`a`/`j`/`u`/`c` byte immediately followed by whitespace
+     * (e.g. `h $x`). This distinguishes the legacy text form of an escape
+     * directive from a helper/function call whose name merely starts with one
+     * of those letters (e.g. `asset(...)`, `currentUrl(...)`, `upper(...)`).
+     */
+    private fun isStandaloneEscapeModifier(content: String): Boolean =
+        content.length >= 2 && content[0] in ESCAPE_MODIFIER_CHARS && content[1].isWhitespace()
 
     private fun skipLeadingWhitespace(raw: String, from: Int, until: Int): Int? {
         var i = from
