@@ -4,15 +4,12 @@ import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.util.TextRange
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.*
-import com.intellij.psi.templateLanguages.TemplateLanguageFileViewProvider
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.ProcessingContext
 import com.jetbrains.php.lang.psi.elements.FunctionReference
 import com.jetbrains.php.lang.psi.elements.ParameterList
 import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
-import io.github.jingu.idea_qiq_plugin.lang.QiqFileType
-import io.github.jingu.idea_qiq_plugin.lang.QiqFileTypeOverrider
-import io.github.jingu.idea_qiq_plugin.lang.QiqTemplateLanguage
+import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
 import io.github.jingu.idea_qiq_plugin.util.QiqUtil
 
 class QiqReferenceContributor : PsiReferenceContributor() {
@@ -47,31 +44,8 @@ class QiqReferenceContributor : PsiReferenceContributor() {
         )
     }
 
-    private fun isInQiqFile(element: PsiElement): Boolean {
-        val project = element.project
-        val ilm = InjectedLanguageManager.getInstance(project)
-        val topLevel = ilm.getTopLevelFile(element) ?: element.containingFile ?: return false
-
-        val viewProvider = topLevel.viewProvider
-        if (viewProvider is TemplateLanguageFileViewProvider && viewProvider.baseLanguage == QiqTemplateLanguage) {
-            return true
-        }
-
-        if (topLevel.language == QiqTemplateLanguage) {
-            return true
-        }
-
-        val fileType = topLevel.virtualFile?.fileType
-        if (fileType == QiqFileType) {
-            return true
-        }
-
-        // 最後のフォールバック: 拡張子チェック
-        val name = topLevel.virtualFile?.name ?: return false
-        if (name.endsWith(".qiq") || name.endsWith(".qiq.php")) return true
-
-        return topLevel.virtualFile?.getUserData(QiqFileTypeOverrider.QIQ_MARKER) == true
-    }
+    private fun isInQiqFile(element: PsiElement): Boolean =
+        QiqInjectionSupport.isInQiqFile(element)
 
 }
 
