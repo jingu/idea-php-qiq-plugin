@@ -8,6 +8,7 @@ import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.PsiModificationTracker
 import com.jetbrains.php.PhpIndex
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpModifier
 
 /**
@@ -50,26 +51,13 @@ class QiqHelpersClassResolver(private val project: Project) {
         val index = PhpIndex.getInstance(project)
         val result = mutableMapOf<String, MutableList<Method>>()
         index.processAllSubclasses(HELPERS_BASE_FQN) { phpClass ->
-            // Only user-defined subclasses contribute; library helper classes
-            // (\Qiq\Helpers, \Qiq\Helper\Html\HtmlHelpers, ...) are covered by
-            // the runtime stub already.
-            if (!phpClass.fqn.startsWith(QIQ_NAMESPACE_PREFIX)) {
-                for (method in phpClass.ownMethods) {
-                    if (isHelperMethod(method)) {
-                        result.getOrPut(method.name) { mutableListOf() }.add(method)
-                    }
-                }
+            for (method in helperMethodsOf(phpClass)) {
+                result.getOrPut(method.name) { mutableListOf() }.add(method)
             }
             true
         }
         return result
     }
-
-    private fun isHelperMethod(method: Method): Boolean =
-        method.access == PhpModifier.Access.PUBLIC &&
-            !method.isStatic &&
-            !method.isAbstract &&
-            !method.name.startsWith("__")
 
     companion object {
         private const val HELPERS_BASE_FQN = "\\Qiq\\Helpers"
@@ -77,5 +65,25 @@ class QiqHelpersClassResolver(private val project: Project) {
 
         fun getInstance(project: Project): QiqHelpersClassResolver =
             project.getService(QiqHelpersClassResolver::class.java)
+
+        /**
+         * The public helper methods a single `Qiq\Helpers` subclass
+         * contributes. Library classes under `\Qiq\` contribute nothing
+         * (their built-ins resolve via the runtime stub); only public,
+         * non-static, non-magic own methods of user classes qualify.
+         *
+         * Pure PSI logic (no index access) so it can be unit-tested against
+         * an in-memory file.
+         */
+        fun helperMethodsOf(phpClass: PhpClass): List<Method> {
+            if (phpClass.fqn.startsWith(QIQ_NAMESPACE_PREFIX)) return emptyList()
+            return phpClass.ownMethods.filter(::isHelperMethod)
+        }
+
+        private fun isHelperMethod(method: Method): Boolean =
+            method.access == PhpModifier.Access.PUBLIC &&
+                !method.isStatic &&
+                !method.isAbstract &&
+                !method.name.startsWith("__")
     }
 }
