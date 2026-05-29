@@ -56,6 +56,26 @@
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
 
+        <!-- Helper-call navigation: jump from `{{ myHelper(...) }}` /
+             `{{ $this->myHelper(...) }}` to the PHP class registered via
+             HelperLocator::set(). Implemented as a GotoDeclarationHandler
+             (not a referenceContributor) because function/method call names
+             carry their own resolution and never aggregate contributed
+             references. Targets come from QiqHelperRegistry, which scans the
+             bootstrap files nominated in Settings > Languages & Frameworks >
+             Qiq Templates. -->
+        <gotoDeclarationHandler
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqHelperGotoDeclarationHandler"/>
+
+        <!-- Suppress "undefined function/method" warnings for helper calls
+             the plugin can resolve. Qiq dispatches helpers through
+             HelperLocator at runtime, so they have no static declaration in
+             the injected PHP. Mirrors the bundled Blade support's PHP
+             inspection suppressor. -->
+        <lang.inspectionSuppressor
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqHelperInspectionSuppressor"/>
+
         <!-- ElementManipulators: required for refactorings (Rename, Move, etc.)
              to propagate edits made inside the injected PHP back to the Qiq host. -->
         <lang.elementManipulator

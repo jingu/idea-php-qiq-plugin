@@ -32,7 +32,14 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
         // escape directives (e.g. `{{h true }}`, `{{h 123 }}`) surface as
         // PhpStorm type warnings. Off by default to match Qiq's runtime
         // behaviour, which performs implicit scalar→string casts.
-        var enableStrictTypes: Boolean = false
+        var enableStrictTypes: Boolean = false,
+        // Paths to PHP files that register Qiq helpers via
+        // `$locator->set('name', closure)` on Qiq\HelperLocator (or a
+        // subclass such as BEAR\QiqModule\HelperLocator). QiqHelperRegistry
+        // scans these to build a helperName → PHP class map for Go to
+        // Declaration in templates. Paths are interpreted relative to the
+        // project content root when not absolute.
+        var helperBootstrapFiles: MutableList<String> = mutableListOf()
     )
 
     private var state = State()
@@ -50,6 +57,40 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
 
     fun setStrictTypesEnabled(enabled: Boolean) {
         state.enableStrictTypes = enabled
+    }
+
+    /** Bootstrap files registered for HelperLocator scanning. Returned as a defensive copy. */
+    fun getHelperBootstrapFiles(): List<String> = state.helperBootstrapFiles.toList()
+
+    fun setHelperBootstrapFiles(paths: List<String>) {
+        state.helperBootstrapFiles = paths.toMutableList()
+    }
+
+    /**
+     * Resolve a configured helper bootstrap path (absolute, or relative to
+     * the project base dir / a content root) to a VirtualFile. Returns null
+     * when the file does not exist or is not a regular file.
+     */
+    fun resolveHelperBootstrapFile(raw: String): VirtualFile? {
+        val path = raw.trim()
+        if (path.isEmpty()) return null
+        val lfs = LocalFileSystem.getInstance()
+
+        if (File(path).isAbsolute) {
+            return lfs.findFileByPath(path)?.takeIf { it.isValid && !it.isDirectory }
+        }
+
+        val relative = path.removePrefix("/")
+        val roots = buildList {
+            project.basePath?.let(lfs::findFileByPath)?.let(::add)
+            addAll(com.intellij.openapi.roots.ProjectRootManager.getInstance(project).contentRoots)
+        }
+        for (root in roots) {
+            root.findFileByRelativePath(relative)
+                ?.takeIf { it.isValid && !it.isDirectory }
+                ?.let { return it }
+        }
+        return null
     }
 
 

@@ -230,6 +230,37 @@ class QiqPhpInjectorTest {
         }
     }
 
+    @Test
+    fun rawEchoHelperCallStartingWithEscapeLetterIsNotStripped(project: Project) {
+        // Regression: `{{= asset(...) }}` is a RAW_CONTENT host whose content
+        // starts with `a`. The injector must NOT treat the leading `a` as the
+        // `{{a }}` attribute-escape modifier — doing so corrupted the call to
+        // `sset(...)`. Helper names beginning with h/a/j/u/c (asset,
+        // currentUrl, upper, ...) must pass through verbatim.
+        val cases = listOf(
+            "{{= asset('/js/common.js') }}" to "asset('/js/common.js')",
+            "{{= currentUrl(\$url) }}" to "currentUrl(\$url)",
+            "{{= upper(\$name) }}" to "upper(\$name)",
+        )
+
+        ApplicationManager.getApplication().runReadAction {
+            for ((template, expectedExpr) in cases) {
+                val psiFile = createQiqFile(project, template)
+                val host = PsiTreeUtil.collectElementsOfType(psiFile, QiqCodeHost::class.java).single()
+
+                val registrar = RecordingRegistrar()
+                injector.getLanguagesToInject(registrar, host)
+
+                val call = registrar.calls.single { it.language == PhpLanguage.INSTANCE }
+                assertEquals("<?= ", call.prefix, "Raw echo must use a plain echo tag for $template")
+                assertEquals(" ?>", call.suffix, "Wrong suffix for $template")
+
+                val injectedExpr = call.host.text.substring(call.range.startOffset, call.range.endOffset)
+                assertEquals(expectedExpr, injectedExpr, "Leading byte must not be stripped for $template")
+            }
+        }
+    }
+
     private fun createQiqFile(project: Project, text: String): PsiFile {
         // In-memory PSI construction: no write lock required, and wrapping in
         // WriteAction throws if the caller is already inside a ReadAction (which
