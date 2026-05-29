@@ -113,21 +113,21 @@
     </actions>
     <change-notes><![CDATA[
 <ul>
-  <li><b>Type-aware escape directives</b>
+  <li><b>Go to Declaration for Qiq helpers</b>
     <ul>
-      <li><code>{{h }}</code>, <code>{{a }}</code>, <code>{{j }}</code>, <code>{{u }}</code>, <code>{{c }}</code> are routed through typed runtime stubs so PhpStorm flags wrong argument types (arrays, objects without <code>__toString</code>, etc.).</li>
-      <li>The strict (Qiq 1.x) or relaxed (Qiq 2.x / 3.x) escape signature is selected automatically from <code>composer.lock</code>.</li>
+      <li>Cmd/Ctrl+click on a helper call (<code>{{ helperName(...) }}</code> or <code>{{ $this-&gt;helperName(...) }}</code>) now jumps to the helper's PHP declaration.</li>
+      <li><b>Qiq 2.x / 3.x</b>: public methods on a <code>Qiq\Helpers</code> subclass (the official custom-helper style) are discovered automatically &mdash; no configuration needed.</li>
+      <li><b>Qiq 1.x</b>: helpers registered via <code>HelperLocator::set('name', ...)</code> resolve once you point the plugin at your registration file(s) under <i>Settings &gt; Languages &amp; Frameworks &gt; Qiq Templates &gt; Helper Locator bootstrap files</i>.</li>
     </ul>
   </li>
-  <li><b>Cross-template rename refactoring</b>
+  <li><b>Fewer false &ldquo;undefined function/method&rdquo; warnings</b>
     <ul>
-      <li>Renaming a PHP property, method, or local variable now propagates into Qiq template references.</li>
-      <li>Shift+F6 triggered from inside a Qiq template (e.g. on <code>title</code> in <code>{{h $article-&gt;title }}</code>) opens the rename dialog and updates both the PHP declaration and every template usage.</li>
+      <li>Resolvable helper calls inside Qiq templates no longer trigger PhpStorm's undefined function/method inspection.</li>
     </ul>
   </li>
-  <li><b>Strict Types setting</b>
+  <li><b>Fix: raw-echo helper names</b>
     <ul>
-      <li>New project setting under <i>Settings &gt; Languages &amp; Frameworks &gt; Qiq Templates</i> that injects <code>declare(strict_types=1)</code> into Qiq templates so scalar literal misuses such as <code>{{h true }}</code> or <code>{{h 123 }}</code> surface as type warnings. Off by default.</li>
+      <li><code>{{= asset(...) }}</code> and other <code>{{= }}</code> calls whose names start with <code>h</code>/<code>a</code>/<code>j</code>/<code>u</code>/<code>c</code> (e.g. <code>asset</code>, <code>currentUrl</code>, <code>upper</code>) are no longer mis-parsed by stripping the leading letter as an escape modifier.</li>
     </ul>
   </li>
 </ul>
