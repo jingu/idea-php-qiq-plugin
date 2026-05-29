@@ -13,7 +13,7 @@ Qiq Templates Support is an IntelliJ-based plugin that brings syntax highlightin
 - **Composer-aware stub selection**: the strict (Qiq 1.x) or relaxed (Qiq 2.x / 3.x) escape signature is chosen automatically from `composer.lock`.
 - **Cross-template rename refactoring**: renaming a PHP property, method, or local variable propagates into every Qiq template that references it. Triggering Shift+F6 from inside a Qiq template (`{{h $article->title }}`) also works.
 - **Cross-template navigation**: Cmd/Ctrl+click (Go to Declaration) on `setLayout()`, `render()`, `include()`, or custom helpers to open the referenced template file.
-- **Helper Go to Declaration**: Cmd/Ctrl+click on a helper call (`{{ helperName(...) }}` / `{{ $this->helperName(...) }}`) jumps to its PHP declaration. Qiq 2.x/3.x helpers (public methods on a `Qiq\Helpers` subclass) are discovered automatically; Qiq 1.x `HelperLocator::set()` helpers resolve once you point the plugin at your registration file in settings. Resolvable helper calls also stop triggering the "undefined function" warning.
+- **Helper Go to Declaration**: Cmd/Ctrl+click on a helper call (`{{ helperName(...) }}` / `{{ $this->helperName(...) }}`) jumps to its PHP declaration. Qiq 2.x/3.x helpers (public methods on a `Qiq\Helpers` subclass) are discovered automatically; Qiq 1.x `HelperLocator::set()` helpers resolve once you point the plugin at your registration file in settings. Resolvable helper calls also stop triggering the "undefined function/method" warning.
 - **Enter/typing handlers** that auto-complete Qiq block closers and keep indentation consistent.
 - **Template discovery**: resolves relative paths by walking up from the current file, project roots, and PHP server document roots.
 

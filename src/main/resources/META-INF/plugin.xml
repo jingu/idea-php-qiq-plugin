@@ -117,10 +117,10 @@
     <ul>
       <li>Cmd/Ctrl+click on a helper call (<code>{{ helperName(...) }}</code> or <code>{{ $this-&gt;helperName(...) }}</code>) now jumps to the helper's PHP declaration.</li>
       <li><b>Qiq 2.x / 3.x</b>: public methods on a <code>Qiq\Helpers</code> subclass (the official custom-helper style) are discovered automatically &mdash; no configuration needed.</li>
-      <li><b>Qiq 1.x</b>: helpers registered via <code>HelperLocator::set('name', ...)</code> resolve once you point the plugin at your registration file under <i>Settings &gt; Languages &amp; Frameworks &gt; Qiq Templates &gt; Helper Locator bootstrap files</i>.</li>
+      <li><b>Qiq 1.x</b>: helpers registered via <code>HelperLocator::set('name', ...)</code> resolve once you point the plugin at your registration file(s) under <i>Settings &gt; Languages &amp; Frameworks &gt; Qiq Templates &gt; Helper Locator bootstrap files</i>.</li>
     </ul>
   </li>
-  <li><b>Fewer false &ldquo;undefined function&rdquo; warnings</b>
+  <li><b>Fewer false &ldquo;undefined function/method&rdquo; warnings</b>
     <ul>
       <li>Resolvable helper calls inside Qiq templates no longer trigger PhpStorm's undefined function/method inspection.</li>
     </ul>
