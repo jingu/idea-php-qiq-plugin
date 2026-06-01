@@ -13,8 +13,7 @@ import com.jetbrains.php.lang.psi.elements.ParameterList
 import com.jetbrains.php.lang.psi.elements.PhpTypedElement
 import com.jetbrains.php.lang.psi.resolve.types.PhpType
 import com.jetbrains.php.lang.psi.visitors.PhpElementVisitor
-import io.github.jingu.idea_qiq_plugin.helper.QiqHelperRegistry
-import io.github.jingu.idea_qiq_plugin.helper.QiqHelpersClassResolver
+import io.github.jingu.idea_qiq_plugin.helper.QiqHelperTargets
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
 import io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService
 import io.github.jingu.idea_qiq_plugin.ui.QiqBundle
@@ -55,7 +54,7 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
         if (!QiqInjectionSupport.isInQiqFile(call)) return
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return
-        val targets = resolveHelperTargets(call, name)
+        val targets = QiqHelperTargets.functions(call.project, name)
         if (targets.isEmpty()) return
 
         val parameterList = call.parameterList ?: return
@@ -123,16 +122,6 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
                 )
             }
         }
-    }
-
-    private fun resolveHelperTargets(call: FunctionReference, name: String): List<Function> {
-        val project = call.project
-        val targets = mutableListOf<Function>()
-        QiqHelperRegistry.getInstance(project).resolveClasses(name)
-            .mapNotNull { it.findMethodByName("__invoke") }
-            .forEach(targets::add)
-        targets.addAll(QiqHelpersClassResolver.getInstance(project).resolve(name))
-        return targets
     }
 
     /**

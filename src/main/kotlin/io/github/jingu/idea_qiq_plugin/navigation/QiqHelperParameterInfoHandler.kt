@@ -5,7 +5,6 @@ import com.intellij.lang.parameterInfo.ParameterInfoHandler
 import com.intellij.lang.parameterInfo.ParameterInfoUIContext
 import com.intellij.lang.parameterInfo.ParameterInfoUtils
 import com.intellij.lang.parameterInfo.UpdateParameterInfoContext
-import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.lexer.PhpTokenTypes
@@ -13,8 +12,7 @@ import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.FunctionReference
 import com.jetbrains.php.lang.psi.elements.Parameter
 import com.jetbrains.php.lang.psi.elements.ParameterList
-import io.github.jingu.idea_qiq_plugin.helper.QiqHelperRegistry
-import io.github.jingu.idea_qiq_plugin.helper.QiqHelpersClassResolver
+import io.github.jingu.idea_qiq_plugin.helper.QiqHelperTargets
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
 
 /**
@@ -41,7 +39,7 @@ class QiqHelperParameterInfoHandler : ParameterInfoHandler<ParameterList, Functi
         if (!QiqInjectionSupport.isInQiqFile(call)) return null
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return null
-        val targets = resolveHelperTargets(call.project, name)
+        val targets = QiqHelperTargets.functions(call.project, name)
         if (targets.isEmpty()) return null
 
         context.itemsToShow = targets.toTypedArray()
@@ -102,20 +100,6 @@ class QiqHelperParameterInfoHandler : ParameterInfoHandler<ParameterList, Functi
         // Caret on the call name or the parentheses, which are siblings of the
         // ParameterList under the call. Climb to the call and take its list.
         return PsiTreeUtil.getParentOfType(element, FunctionReference::class.java, false)?.parameterList
-    }
-
-    /**
-     * Resolve [name] to the callable target(s) whose signature to show: a 1.x
-     * helper class's `__invoke` (classes without one are dropped — there is no
-     * signature to present) plus any 2.x/3.x helper methods.
-     */
-    private fun resolveHelperTargets(project: Project, name: String): List<Function> {
-        val targets = mutableListOf<Function>()
-        QiqHelperRegistry.getInstance(project).resolveClasses(name)
-            .mapNotNull { it.findMethodByName("__invoke") }
-            .forEach(targets::add)
-        targets.addAll(QiqHelpersClassResolver.getInstance(project).resolve(name))
-        return targets
     }
 
     private fun renderParameter(parameter: Parameter): String = buildString {

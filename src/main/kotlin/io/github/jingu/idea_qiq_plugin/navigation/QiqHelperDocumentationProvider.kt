@@ -6,8 +6,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.elements.FunctionReference
-import io.github.jingu.idea_qiq_plugin.helper.QiqHelperRegistry
-import io.github.jingu.idea_qiq_plugin.helper.QiqHelpersClassResolver
+import io.github.jingu.idea_qiq_plugin.helper.QiqHelperTargets
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
 
 /**
@@ -40,15 +39,8 @@ class QiqHelperDocumentationProvider : AbstractDocumentationProvider() {
         if (!QiqInjectionSupport.isInQiqFile(call)) return null
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return null
-        return resolveHelperTarget(call, name)
-    }
-
-    /** The single declaration to document: `__invoke` for a 1.x class, else a 2.x/3.x method. */
-    private fun resolveHelperTarget(call: FunctionReference, name: String): PsiElement? {
-        val project = call.project
-        QiqHelperRegistry.getInstance(project).resolveClasses(name)
-            .firstNotNullOfOrNull { it.findMethodByName("__invoke") }
-            ?.let { return it }
-        return QiqHelpersClassResolver.getInstance(project).resolve(name).firstOrNull()
+        // Document the first resolved target (`__invoke` for a 1.x class, else
+        // a 2.x/3.x method); for an overloaded name PhpStorm documents one.
+        return QiqHelperTargets.functions(call.project, name).firstOrNull()
     }
 }
