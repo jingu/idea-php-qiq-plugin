@@ -13,7 +13,6 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import io.github.jingu.idea_qiq_plugin.util.QiqComposerVersionResolver
 import java.io.File
-import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 
@@ -129,9 +128,12 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
      */
     fun resolveTemplateBase(contextFile: VirtualFile): VirtualFile? {
         val key = CacheKey(contextFile.path)
-        baseCacheMap[key]?.let { return it.orElse(null) }
-        val computed = computeTemplateBase(contextFile)
-        baseCacheMap[key] = Optional.ofNullable(computed)
+        baseCacheMap[key]?.let { return it }
+        // Cache only a positive result; a null base means the file is not (yet)
+        // inside a template tree, and recomputing lets it pick up once it is —
+        // mirrors how resolveTemplateRoots declines to cache an empty result.
+        val computed = computeTemplateBase(contextFile) ?: return null
+        baseCacheMap[key] = computed
         return computed
     }
 
@@ -198,9 +200,9 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
     // Same rationale as composerLockCache: resolveTemplateRoots is called
     // from completion/navigation contributors running on parallel ReadActions.
     private val cacheMap = ConcurrentHashMap<CacheKey, List<VirtualFile>>()
-    // resolveTemplateBase is hit on every completion keystroke; cache its
-    // result (Optional because ConcurrentHashMap forbids null values).
-    private val baseCacheMap = ConcurrentHashMap<CacheKey, Optional<VirtualFile>>()
+    // resolveTemplateBase is hit on every completion keystroke; cache the
+    // positive result (a null base is intentionally left uncached).
+    private val baseCacheMap = ConcurrentHashMap<CacheKey, VirtualFile>()
 
     private fun getCached(contextFile: VirtualFile): List<VirtualFile> =
         cacheMap[CacheKey(contextFile.path)] ?: emptyList()

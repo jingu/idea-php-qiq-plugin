@@ -41,9 +41,12 @@ class QiqTemplatePathInspection : LocalInspectionTool() {
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return
         if (name !in TEMPLATE_FUNCTIONS) return
-        // `$foo->render(...)` is some other object's method; only `$this->...`
-        // (and bare calls) reference a Qiq template.
-        if (call is MethodReference && (call.classReference as? Variable)?.name != "this") return
+        // Bare calls (`render('...')`) and the injected static directive
+        // (`\QiqRuntimeFunctions::extends('...')`) are template calls. An
+        // *instance* call is only one when the receiver is `$this`; skip
+        // `$other->render(...)`, which is some unrelated object's method.
+        val receiver = (call as? MethodReference)?.classReference
+        if (receiver is Variable && receiver.name != "this") return
 
         val arg = call.parameterList?.parameters?.firstOrNull() as? StringLiteralExpression ?: return
         val path = arg.contents
