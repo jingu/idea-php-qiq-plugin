@@ -9,6 +9,8 @@
     <depends>com.jetbrains.php</depends>
     <depends>com.intellij.modules.xml</depends>
 
+    <resource-bundle>messages.QiqBundle</resource-bundle>
+
     <extensions defaultExtensionNs="com.intellij">
         <fileType
                 name="Qiq"
@@ -63,7 +65,6 @@
         <localInspection
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqTemplatePathInspection"
-                bundle="messages.QiqBundle"
                 groupKey="inspection.group.qiq"
                 key="inspection.template.path.name"
                 enabledByDefault="true"
@@ -80,6 +81,15 @@
         <gotoDeclarationHandler
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqHelperGotoDeclarationHandler"/>
 
+        <!-- Quick Documentation for helper calls. The injected `helper(...)` is
+             an unresolved global call, so PhpStorm shows an empty
+             "Source: .../null"; this points the doc at the resolved helper
+             target (1.x `__invoke` / 2.x-3.x method) so its signature and real
+             source file are shown instead. -->
+        <lang.documentationProvider
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.navigation.QiqHelperDocumentationProvider"/>
+
         <!-- Suppress "undefined function/method" warnings for helper calls
              the plugin can resolve. Qiq dispatches helpers through
              HelperLocator at runtime, so they have no static declaration in
@@ -88,6 +98,28 @@
         <lang.inspectionSuppressor
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqHelperInspectionSuppressor"/>
+
+        <!-- Argument check for helper calls. PhpStorm cannot check the
+             arguments of an unresolved `helper(...)` call, so this compares the
+             call against the resolved helper target's signature (1.x `__invoke`
+             / 2.x-3.x method): argument count, plus the type of each positional
+             argument. Conservative — skipped for named/spread arguments and for
+             any argument whose type is not fully known. -->
+        <localInspection
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqHelperArgumentsInspection"
+                groupKey="inspection.group.qiq"
+                key="inspection.helper.arguments.name"
+                enabledByDefault="true"
+                level="WARNING"/>
+
+        <!-- Parameter info (Ctrl/Cmd+P + the auto popup after `(`) for helper
+             calls. The injected `helper(...)` is an unresolved global call, so
+             PhpStorm's own handler shows nothing; this one renders the resolved
+             helper target's signature (1.x `__invoke` / 2.x-3.x method). -->
+        <codeInsight.parameterInfo
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.navigation.QiqHelperParameterInfoHandler"/>
 
         <!-- Complete custom helper names (1.x HelperLocator registrations +
              2.x/3.x Qiq\Helpers subclass methods) at call positions inside
