@@ -56,6 +56,19 @@
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
 
+        <!-- Warn when setLayout()/render()/extends()/include() reference a
+             template that does not exist. Uses the same resolver as Go to
+             Declaration, so a path is flagged exactly when Cmd/Ctrl+click would
+             fail to navigate. Only plain string literals are checked. -->
+        <localInspection
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqTemplatePathInspection"
+                bundle="messages.QiqBundle"
+                groupKey="inspection.group.qiq"
+                key="inspection.template.path.name"
+                enabledByDefault="true"
+                level="WARNING"/>
+
         <!-- Helper-call navigation: jump from `{{ myHelper(...) }}` /
              `{{ $this->myHelper(...) }}` to the PHP class registered via
              HelperLocator::set(). Implemented as a GotoDeclarationHandler
