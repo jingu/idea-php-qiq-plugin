@@ -52,6 +52,9 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
 
     private fun inspectCall(call: FunctionReference, holder: ProblemsHolder) {
         if (!QiqInjectionSupport.isInQiqFile(call)) return
+        // Only bare / `$this->` calls dispatch a helper; `$other->renderAd(...)`
+        // and `Foo::renderAd(...)` merely share the name.
+        if (!QiqHelperTargets.isHelperDispatch(call)) return
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return
         val targets = QiqHelperTargets.functions(call.project, name)
@@ -185,9 +188,13 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
                     ')', ']', '}' -> depth--
                     '.' -> if (depth == argDepth && text.startsWith("...", i)) return true
                     ':' -> {
-                        // A single top-level colon separates `name: value`.
-                        // `::` (static access) and ternary colons nested in an
-                        // argument are excluded by the depth / double-colon guard.
+                        // A single top-level colon usually separates `name: value`.
+                        // `::` (static access) and colons nested inside brackets
+                        // are excluded by the double-colon / depth guard. A
+                        // top-level ternary `?:` colon is NOT distinguished and
+                        // also trips this — that only over-reports "uncountable",
+                        // conservatively skipping the count/type check, never a
+                        // false positive.
                         val prev = text.getOrNull(i - 1)
                         val next = text.getOrNull(i + 1)
                         if (depth == argDepth && prev != ':' && next != ':') return true

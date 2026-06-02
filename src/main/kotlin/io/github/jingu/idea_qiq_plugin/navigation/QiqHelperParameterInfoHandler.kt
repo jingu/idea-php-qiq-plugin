@@ -37,6 +37,8 @@ class QiqHelperParameterInfoHandler : ParameterInfoHandler<ParameterList, Functi
         val parameterList = parameterListAt(context.file, context.offset) ?: return null
         val call = parameterList.parent as? FunctionReference ?: return null
         if (!QiqInjectionSupport.isInQiqFile(call)) return null
+        // Only bare / `$this->` calls dispatch a helper, not `$other->name(...)`.
+        if (!QiqHelperTargets.isHelperDispatch(call)) return null
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return null
         val targets = QiqHelperTargets.functions(call.project, name)

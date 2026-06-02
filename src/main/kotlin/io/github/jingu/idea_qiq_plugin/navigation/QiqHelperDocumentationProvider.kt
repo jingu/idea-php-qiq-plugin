@@ -37,6 +37,8 @@ class QiqHelperDocumentationProvider : AbstractDocumentationProvider() {
         if (!nameNode.textRange.contains(element.textRange)) return null
 
         if (!QiqInjectionSupport.isInQiqFile(call)) return null
+        // Only bare / `$this->` calls dispatch a helper, not `$other->name(...)`.
+        if (!QiqHelperTargets.isHelperDispatch(call)) return null
 
         val name = call.name?.takeIf { it.isNotEmpty() } ?: return null
         // Document the first resolved target (`__invoke` for a 1.x class, else

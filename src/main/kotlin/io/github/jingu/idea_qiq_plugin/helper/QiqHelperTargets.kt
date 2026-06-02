@@ -2,6 +2,9 @@ package io.github.jingu.idea_qiq_plugin.helper
 
 import com.intellij.openapi.project.Project
 import com.jetbrains.php.lang.psi.elements.Function
+import com.jetbrains.php.lang.psi.elements.FunctionReference
+import com.jetbrains.php.lang.psi.elements.MethodReference
+import com.jetbrains.php.lang.psi.elements.Variable
 
 /**
  * Resolves a Qiq helper name to the callable PHP declaration(s) it dispatches
@@ -25,4 +28,14 @@ object QiqHelperTargets {
         targets.addAll(QiqHelpersClassResolver.getInstance(project).resolve(name))
         return targets
     }
+
+    /**
+     * Whether [call] is shaped like a Qiq helper dispatch: a bare call
+     * (`helper(...)`) or a `$this->helper(...)` method call. A call on any other
+     * receiver — `$other->helper(...)`, `Foo::helper(...)` — is an ordinary PHP
+     * call that merely shares a name with a helper, not a helper invocation, so
+     * the signature-based features must not treat it as one.
+     */
+    fun isHelperDispatch(call: FunctionReference): Boolean =
+        call !is MethodReference || (call.classReference as? Variable)?.name == "this"
 }
