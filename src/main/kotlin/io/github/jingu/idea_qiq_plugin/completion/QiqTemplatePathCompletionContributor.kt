@@ -5,6 +5,7 @@ import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
+import com.intellij.codeInsight.completion.PlainPrefixMatcher
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.progress.ProgressManager
@@ -58,23 +59,42 @@ class QiqTemplatePathCompletionContributor : CompletionContributor() {
                 .virtualFile ?: return
 
             val settings = QiqSettingsService.getInstance(project)
-            val roots = settings.resolveTemplateRoots(contextFile)
-            if (roots.isEmpty()) return
             val extensions = settings.state.candidateExtensions
 
             // Replace the already-typed in-quote text, so `layout/ba` is
             // matched/replaced rather than matching against the whole literal.
             val typedPrefix = inQuotePrefix(stringLiteral, parameters.offset) ?: return
-            val pathResult = result.withPrefixMatcher(typedPrefix)
 
-            val paths = LinkedHashSet<String>()
-            for (root in roots) {
-                collectTemplatePaths(root, root, extensions, paths)
+            // Substring matching (PlainPrefixMatcher in contains mode, not the
+            // default camel-hump matcher): the leading `/` is optional in Qiq, so
+            // `partial/ad` must surface `/partial/ad/adtag`, and any path that
+            // contains the typed fragment is offered. True prefix hits still rank
+            // first via the matcher's isStartMatch.
+            val pathResult = result.withPrefixMatcher(PlainPrefixMatcher(typedPrefix, false))
+
+            val seen = HashSet<String>()
+            fun offer(path: String) {
+                if (seen.add(path)) {
+                    pathResult.addElement(LookupElementBuilder.create(path).withTypeText("Qiq template", true))
+                }
             }
-            for (path in paths) {
-                pathResult.addElement(
-                    LookupElementBuilder.create(path).withTypeText("Qiq template", true),
-                )
+
+            // Relative paths, resolved against the directory the current template
+            // lives in (a bare `partial/...` as written without a leading slash).
+            for (root in settings.resolveTemplateRoots(contextFile)) {
+                val rel = LinkedHashSet<String>()
+                collectTemplatePaths(root, root, extensions, rel)
+                rel.forEach(::offer)
+            }
+
+            // Root-absolute paths from the template base (`/layout/base`) — the
+            // form layouts and shared partials are usually referenced by. Offered
+            // with the leading `/` so the slash is part of the completed text;
+            // PlainPrefixMatcher keeps `/l` matching only `/layout/...`.
+            settings.resolveTemplateBase(contextFile)?.let { base ->
+                val abs = LinkedHashSet<String>()
+                collectTemplatePaths(base, base, extensions, abs)
+                abs.forEach { offer("/$it") }
             }
         }
 

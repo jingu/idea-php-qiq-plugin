@@ -4,6 +4,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.PersistentStateComponent
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.roots.ProjectFileIndex
@@ -12,6 +13,7 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import io.github.jingu.idea_qiq_plugin.util.QiqComposerVersionResolver
 import java.io.File
+import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 
@@ -108,6 +110,55 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
     }
 
     /**
+     * The template root for a Qiq root-absolute path (one written with a
+     * leading `/`, e.g. `setLayout('/layout/base')`, which Qiq resolves from
+     * the engine's template directory rather than the current file's folder).
+     *
+     * [resolveTemplateRoots] is content-driven and deliberately favours the
+     * dense template sub-directories near [contextFile], so it never yields the
+     * shared parent that a `/`-path is relative to. This walks up instead: from
+     * the file's folder toward the content root, ascending only while the next
+     * parent stays *inside* the template tree — i.e. it has no non-template
+     * sibling directory. The walk stops at the first parent that mixes in a
+     * non-template directory (e.g. `qiq/` holding both `template/` and a
+     * `helper/` of plain PHP), so the base lands on `template/` rather than
+     * climbing to `qiq/` or `var/`.
+     *
+     * Returns null when the file is outside any content root or its own folder
+     * does not look like a template directory.
+     */
+    fun resolveTemplateBase(contextFile: VirtualFile): VirtualFile? {
+        val key = CacheKey(contextFile.path)
+        baseCacheMap[key]?.let { return it.orElse(null) }
+        val computed = computeTemplateBase(contextFile)
+        baseCacheMap[key] = Optional.ofNullable(computed)
+        return computed
+    }
+
+    private fun computeTemplateBase(contextFile: VirtualFile): VirtualFile? {
+        // Upper bound for the ascent; the sibling-boundary check below is the
+        // real stop, this just guarantees we never climb past the project.
+        val stop = ProjectFileIndex.getInstance(project).getContentRootForFile(contextFile)
+            ?: project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+        var cur = (if (contextFile.isDirectory) contextFile else contextFile.parent) ?: return null
+        if (!Resolver.looksLikeTemplateDir(cur, state)) return null
+        var base = cur
+        var depth = 0
+        while (depth <= state.maxAscendDepth) {
+            val parent = cur.parent ?: break
+            if (parent == stop) break
+            // Ascend into the parent only while every one of its sub-directories
+            // is itself template content; a non-template sibling marks the edge
+            // of the template tree, which is the Qiq root a `/`-path uses.
+            if (!Resolver.allChildDirsLookLikeTemplates(parent, state)) break
+            base = parent
+            cur = parent
+            depth++
+        }
+        return base
+    }
+
+    /**
      * Returns the qiq/qiq major version declared in composer.lock for the
      * content root that owns [contextFile]. Falls back to 3 when the lock
      * file is missing, the package is not present, or the version string is
@@ -147,6 +198,9 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
     // Same rationale as composerLockCache: resolveTemplateRoots is called
     // from completion/navigation contributors running on parallel ReadActions.
     private val cacheMap = ConcurrentHashMap<CacheKey, List<VirtualFile>>()
+    // resolveTemplateBase is hit on every completion keystroke; cache its
+    // result (Optional because ConcurrentHashMap forbids null values).
+    private val baseCacheMap = ConcurrentHashMap<CacheKey, Optional<VirtualFile>>()
 
     private fun getCached(contextFile: VirtualFile): List<VirtualFile> =
         cacheMap[CacheKey(contextFile.path)] ?: emptyList()
@@ -249,6 +303,46 @@ class QiqSettingsService(private val project: Project) : PersistentStateComponen
                 breadth = subdirsWithQiq.size,
                 layoutHints = layoutHints
             )
+        }
+
+        // Used by resolveTemplateBase's ascent: a directory "looks like" a
+        // template directory once its subtree yields a file with Qiq tokens.
+        // Cheap by design — only candidate-extension files are read, and the
+        // walk stops at the first token hit (or after LOOKS_LIKE_FILE_CAP files
+        // for a directory that is plain PHP / not a template root).
+        private const val LOOKS_LIKE_FILE_CAP = 80
+
+        fun looksLikeTemplateDir(dir: VirtualFile, st: State): Boolean {
+            var scanned = 0
+
+            fun visit(d: VirtualFile): Boolean {
+                for (c in d.children.orEmpty()) {
+                    ProgressManager.checkCanceled()
+                    if (scanned >= LOOKS_LIKE_FILE_CAP) return false
+                    if (c.isDirectory) {
+                        if (visit(c)) return true
+                        continue
+                    }
+                    val name = c.name.lowercase()
+                    if (st.candidateExtensions.none { name.endsWith(it) }) continue
+                    scanned++
+                    val text = runCatching { VfsUtilCore.loadText(c) }.getOrNull()?.let {
+                        if (it.length > st.maxBytesPerFile) it.substring(0, st.maxBytesPerFile) else it
+                    } ?: continue
+                    if (countQiqTokens(text) > 0) return true
+                }
+                return false
+            }
+            return visit(dir)
+        }
+
+        // True when [dir] has at least one sub-directory and every one of them
+        // is template content. Used to decide whether ascending into [dir]
+        // stays inside the template tree (no non-template sibling like helper/).
+        fun allChildDirsLookLikeTemplates(dir: VirtualFile, st: State): Boolean {
+            val childDirs = dir.children.orEmpty().filter { it.isDirectory }
+            if (childDirs.isEmpty()) return false
+            return childDirs.all { looksLikeTemplateDir(it, st) }
         }
 
         private fun countQiqTokens(text: String): Int {
