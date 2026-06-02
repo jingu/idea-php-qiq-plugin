@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
  *  - `static fn (): ClassName => new ClassName(...)`
  *  - `function () { return new ClassName(...); }` (no declared return)
  *  - `fn () => new ClassName(...)` (no declared return)
- *  - `$x->register(...)` and `$x->setFactory(...)` aliases
+ *  - `$x->setFactory(...)` alias (and `register(...)` deliberately ignored)
  *
  * Combined, these patterns cover every `$locator->set(...)` call observed
  * in Hpplus.Spur's `QiqHelperLocatorProvider`.
@@ -134,7 +134,7 @@ class QiqHelperRegistryTest {
     }
 
     @Test
-    fun acceptsRegisterAndSetFactoryAliases(project: Project) {
+    fun acceptsSetFactoryAliasButNotUnrelatedRegister(project: Project) {
         val map = scan(
             project,
             """
@@ -149,14 +149,17 @@ class QiqHelperRegistryTest {
             {
                 public function build(HelperLocator ${'$'}locator): void
                 {
-                    ${'$'}locator->register('foo', static fn (): Foo => new Foo());
                     ${'$'}locator->setFactory('bar', static fn (): Bar => new Bar());
+                    // `register` is intentionally not a helper-registration
+                    // method, so this must NOT be indexed.
+                    ${'$'}locator->register('foo', static fn (): Foo => new Foo());
                 }
             }
             """.trimIndent(),
         )
-        assertEquals("\\Qiq\\Helper\\Foo", map["foo"])
         assertEquals("\\Qiq\\Helper\\Bar", map["bar"])
+        assertEquals(null, map["foo"], "register(...) must not be indexed, got: $map")
+        assertEquals(1, map.size, "Only setFactory should be indexed, got: $map")
     }
 
     @Test

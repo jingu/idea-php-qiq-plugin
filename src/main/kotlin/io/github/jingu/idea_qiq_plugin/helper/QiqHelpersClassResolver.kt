@@ -47,6 +47,9 @@ class QiqHelpersClassResolver(private val project: Project) {
 
     fun hasHelper(name: String): Boolean = methodIndex.value.containsKey(name)
 
+    /** Every auto-discovered Qiq 2.x/3.x helper name. */
+    fun allHelperNames(): Set<String> = methodIndex.value.keys
+
     private fun buildIndex(): Map<String, List<Method>> {
         val index = PhpIndex.getInstance(project)
         val result = mutableMapOf<String, MutableList<Method>>()

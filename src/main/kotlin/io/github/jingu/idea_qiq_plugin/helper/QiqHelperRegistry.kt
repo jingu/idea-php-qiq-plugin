@@ -242,11 +242,12 @@ class QiqHelperRegistry(private val project: Project) {
         fun getInstance(project: Project): QiqHelperRegistry =
             project.getService(QiqHelperRegistry::class.java)
 
-        // HelperLocator's public API in Qiq 1.x is `set(name, factory)`.
-        // `setFactory` and `register` are accepted as common subclass
-        // additions (e.g. BEAR\QiqModule\HelperLocator only uses `set`,
-        // but other community wrappers occasionally expose either).
-        private val REGISTRATION_METHOD_NAMES = setOf("set", "setFactory", "register")
+        // HelperLocator's registration API: `set(name, factory)` (Qiq 1.x,
+        // and subclasses such as BEAR\QiqModule\HelperLocator) plus the
+        // `setFactory` alias some wrappers expose. The broader `register`
+        // was dropped to avoid matching unrelated `$x->register('name', fn)`
+        // calls that have nothing to do with Qiq helpers.
+        private val REGISTRATION_METHOD_NAMES = setOf("set", "setFactory")
 
         private val BUILTIN_PSEUDO_TYPES = setOf(
             "\\void", "\\mixed", "\\never", "\\null", "\\true", "\\false",
