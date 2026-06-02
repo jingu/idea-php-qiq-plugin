@@ -79,13 +79,22 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
         parameterList: ParameterList,
         holder: ProblemsHolder,
     ): Boolean {
+        // Valid as soon as one target accepts the count. Checking per target (not
+        // just the global min/max window) catches a count that lands in the gap
+        // between disjoint overloads — invalid for every target yet inside
+        // [minRequired..maxAllowed].
+        if (targets.any { Arity.accepts(it, argCount) }) return false
+
         val arity = Arity.of(targets)
         val message = when {
             argCount < arity.minRequired ->
                 QiqBundle.message("inspection.helper.argcount.few", name, arity.minRequired, argCount)
             arity.maxAllowed != null && argCount > arity.maxAllowed ->
                 QiqBundle.message("inspection.helper.argcount.many", name, arity.maxAllowed, argCount)
-            else -> return false
+            else ->
+                // In the overload gap: accepted by no target, yet within the
+                // global window, so neither "too few" nor "too many" fits.
+                QiqBundle.message("inspection.helper.argcount.invalid", name, argCount)
         }
         holder.registerProblem(parameterList, message)
         return true
@@ -139,6 +148,11 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
                 val maxAllowed = if (targets.any(::hasVariadic)) null else targets.maxOf { it.parameters.size }
                 return Arity(minRequired, maxAllowed)
             }
+
+            /** Whether [function] alone accepts a call of [argCount] arguments. */
+            fun accepts(function: Function, argCount: Int): Boolean =
+                argCount >= requiredCount(function) &&
+                    (hasVariadic(function) || argCount <= function.parameters.size)
 
             private fun requiredCount(function: Function): Int =
                 function.parameters.count { !it.isOptional && !it.isVariadic }
