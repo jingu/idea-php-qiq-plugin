@@ -112,8 +112,10 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
         // though PhpStorm treats null as loosely convertible to a scalar.
         val strict = QiqSettingsService.getInstance(project).isStrictTypesEnabled()
         for (i in args.indices) {
-            val param = params.getOrNull(i) ?: break
-            if (param.isVariadic) break // the variadic tail accepts any extra args
+            // The i-th parameter, or — once past the fixed params — the trailing
+            // variadic, which accepts any *number* of further args but still
+            // constrains each to its (element) type, e.g. `int ...$xs`.
+            val param = params.getOrNull(i) ?: params.lastOrNull()?.takeIf(Parameter::isVariadic) ?: break
 
             val expected = param.declaredType.global(project)
             if (isUncheckable(expected)) continue
