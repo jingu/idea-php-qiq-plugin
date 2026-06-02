@@ -62,8 +62,12 @@ class QiqHelperCompletionContributor : CompletionContributor() {
             }
             if (names.isEmpty()) return
 
+            // Helper names are case-insensitive at runtime (PHP function/method
+            // semantics), so match prefixes case-insensitively like the built-in
+            // PHP function completion does.
+            val sink = result.caseInsensitive()
             for (name in names) {
-                result.addElement(
+                sink.addElement(
                     LookupElementBuilder.create(name)
                         .withTypeText("Qiq helper", true)
                         .withInsertHandler(CALL_INSERT_HANDLER),
