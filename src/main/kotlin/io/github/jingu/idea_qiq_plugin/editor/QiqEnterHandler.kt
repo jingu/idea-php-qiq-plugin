@@ -6,8 +6,8 @@ import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFile
+import io.github.jingu.idea_qiq_plugin.block.QiqBlockModel
 import io.github.jingu.idea_qiq_plugin.lang.QiqTemplateLanguage
-import kotlin.text.RegexOption
 
 class QiqEnterHandler : EnterHandlerDelegateAdapter() {
 
@@ -49,21 +49,14 @@ class QiqEnterHandler : EnterHandlerDelegateAdapter() {
         // 対応する "{{" を左へスキャン
         val openPos = findLastOpenDoubleBrace(text, closeAfter - 2) ?: return Result.Continue
 
-        // 中身を取り出し、先頭トークンを抽出
+        // 中身を取り出し、ブロック opener か判定（ブロックセット・コロンルールは
+        // QiqBlockModel に一元化）
         val inside = text.subSequence(openPos + 2, closeAfter - 2).toString().trim()
-        val head = inside.takeWhile { !it.isWhitespace() && it != '(' && it != ':' }
+        val blockType = QiqBlockModel.openerTypeOf(inside) ?: return Result.Continue
+        val closer = blockType.closeText
 
-        val closer = when {
-            head in blockClosers -> blockClosers.getValue(head)
-            else -> return Result.Continue
-        }
-
-        // if/foreach/for はコロン終端のものだけをブロック扱い（誤爆防止）
-        if (head in listOf("if", "foreach", "for") && !inside.contains(':')) {
-            return Result.Continue
-        }
-
-        if (hasMatchingCloser(text, closeAfter, head, closer)) {
+        // この opener が文書全体で既に閉じられているなら挿入しない
+        if (isOpenerClosed(text, openPos)) {
             return Result.Continue
         }
 
@@ -99,69 +92,13 @@ class QiqEnterHandler : EnterHandlerDelegateAdapter() {
         return null
     }
 
-    internal fun hasMatchingCloser(
-        text: CharSequence,
-        searchStart: Int,
-        head: String,
-        closer: String
-    ): Boolean {
-        val openRegex = openPatterns.getValue(head)
-        val closeRegex = closePatterns.getValue(head)
-
-        var index = searchStart
-        var depth = 0
-
-        while (index < text.length) {
-            val closeMatch = closeRegex.find(text, index)
-            val openMatch = openRegex.find(text, index)
-
-            val next = when {
-                closeMatch == null && openMatch == null -> return false
-                closeMatch != null && (openMatch == null || closeMatch.range.first < openMatch.range.first) -> {
-                    MatchResultWrapper(closeMatch, isClose = true)
-                }
-                else -> MatchResultWrapper(openMatch!!, isClose = false)
-            }
-
-            if (next.isClose) {
-                if (depth == 0) {
-                    return true
-                }
-                depth--
-            } else {
-                depth++
-            }
-            index = next.match.range.last + 1
-        }
-
-        return false
-    }
-
-    internal data class MatchResultWrapper(val match: MatchResult, val isClose: Boolean)
-
-    companion object {
-        internal val blockClosers = mapOf(
-            "setSection" to "endSection()",
-            "setBlock"   to "endBlock()",
-            "if"         to "endif",
-            "foreach"    to "endforeach",
-            "for"        to "endfor",
-        )
-
-        internal val openPatterns: Map<String, Regex> = blockClosers.keys.associateWith { head ->
-            Regex("""\{\{\s*${Regex.escape(head)}\b""", RegexOption.IGNORE_CASE)
-        }
-
-        internal val closePatterns: Map<String, Regex> = blockClosers.mapValues { (_, closer) ->
-            val pattern = if (closer.endsWith("()")) {
-                val name = closer.dropLast(2)
-                """\{\{\s*${Regex.escape(name)}\s*\(\s*\)\s*}}"""
-            } else {
-                """\{\{\s*${Regex.escape(closer)}\b[^}]*}}"""
-            }
-            Regex(pattern, RegexOption.IGNORE_CASE)
-        }
-    }
+    /**
+     * Whether the opener whose `{{` starts at [openPos] is already balanced by a
+     * closer somewhere in [text]. Delegates the pairing to [QiqBlockModel] so the
+     * Enter handler and the block-range features agree on what counts as closed.
+     */
+    internal fun isOpenerClosed(text: CharSequence, openPos: Int): Boolean =
+        QiqBlockModel.computeBlockRanges(text).any { it.open.startOffset == openPos }
 
     // fromOffset 以降で最初の非空行テキストを返す
     private fun findNextNonEmptyLineText(
