@@ -1,14 +1,18 @@
 package io.github.jingu.idea_qiq_plugin.block
 
 import com.intellij.openapi.util.TextRange
+import java.util.Locale
 
 /**
  * The Qiq block directives that come in opener/closer pairs.
  *
- * Mirrors the block set that [io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler]
- * already auto-closes. `if`/`foreach`/`for` use PHP alternative syntax, so an opener
- * is only a block when it is colon-terminated (`{{ if (...): }}`); `setSection` /
- * `setBlock` are call-style openers.
+ * Shares its directive set with [io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler]
+ * (which auto-closes the same blocks). `if`/`foreach`/`for` use PHP alternative syntax,
+ * so an opener is only a block when it is colon-terminated (`{{ if (...): }}`);
+ * `setSection` / `setBlock` are call-style openers. The exact opener/closer parsing
+ * here is deliberately stricter than the keyword set alone to avoid pairing
+ * syntactically invalid directives. Heads are matched case-insensitively, as PHP
+ * keywords and method names are.
  */
 enum class QiqBlockType(
     val openHead: String,
@@ -22,11 +26,11 @@ enum class QiqBlockType(
     BLOCK("setBlock", "endBlock", false);
 
     companion object {
-        private val byOpenHead = entries.associateBy { it.openHead }
-        private val byCloseHead = entries.associateBy { it.closeHead }
+        private val byOpenHead = entries.associateBy { it.openHead.lowercase(Locale.ROOT) }
+        private val byCloseHead = entries.associateBy { it.closeHead.lowercase(Locale.ROOT) }
 
-        fun forOpenHead(head: String): QiqBlockType? = byOpenHead[head]
-        fun forCloseHead(head: String): QiqBlockType? = byCloseHead[head]
+        fun forOpenHead(head: String): QiqBlockType? = byOpenHead[head.lowercase(Locale.ROOT)]
+        fun forCloseHead(head: String): QiqBlockType? = byCloseHead[head.lowercase(Locale.ROOT)]
     }
 }
 
@@ -95,18 +99,25 @@ object QiqBlockModel {
         val head = inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' }
 
         val openType = QiqBlockType.forOpenHead(head)
-        // Alternative syntax terminates the opener with a colon (`{{ if (...): }}`).
-        // Test the trailing colon, not any colon, so a ternary `?:` inside the
-        // condition does not turn a non-block `{{ if (...) }}` into a block opener.
-        if (openType != null && (!openType.requiresColon || inner.trimEnd().endsWith(':'))) {
+        // Every opener is a call/condition form, so it must contain '(' — this rejects
+        // bare `{{ if $x: }}` / `{{ setSection 'a' }}`. if/foreach/for additionally
+        // require the trailing alternative-syntax colon; testing the trailing colon
+        // (not any colon) keeps a ternary `?:` in the condition from being mistaken
+        // for one.
+        if (openType != null && '(' in inner && (!openType.requiresColon || inner.trimEnd().endsWith(':'))) {
             openers.addLast(Pending(openType, delimiter))
             return
         }
 
         val closeType = QiqBlockType.forCloseHead(head) ?: return
-        // setSection/setBlock are call-style, so their closers need parentheses;
-        // `{{ endSection }}` (no parens) is invalid PHP and is not a valid closer.
-        if ((closeType == QiqBlockType.SECTION || closeType == QiqBlockType.BLOCK) && '(' !in inner) return
+        // setSection/setBlock are call-style: only an empty-arg call closes them
+        // (`{{ endSection() }}`, optional trailing `;`). Anything else — no parens,
+        // or arguments — is invalid and must not pair.
+        if ((closeType == QiqBlockType.SECTION || closeType == QiqBlockType.BLOCK) &&
+            !isEmptyArgClose(inner, closeType)
+        ) {
+            return
+        }
         val matchIndex = openers.indexOfLast { it.type == closeType }
         if (matchIndex < 0) return // unmatched closer
 
@@ -115,6 +126,10 @@ object QiqBlockModel {
         while (openers.size > matchIndex) openers.removeLast()
         result.add(QiqBlockRange(closeType, opener.delimiter, delimiter))
     }
+
+    /** True if [inner] is an empty-arg call closer, e.g. `endSection()` / `endBlock() ;`. */
+    private fun isEmptyArgClose(inner: String, type: QiqBlockType): Boolean =
+        Regex("""(?i)${Regex.escape(type.closeHead)}\s*\(\s*\)\s*;?""").matches(inner)
 
     private fun indexOfDoubleBrace(text: CharSequence, from: Int): Int? {
         var j = from

@@ -141,6 +141,29 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun directiveHeadsMatchCaseInsensitively() {
+        // PHP keywords are case-insensitive; uppercase directives still pair.
+        val text = "{{ IF (${'$'}x): }}body{{ ENDIF }}"
+        val block = ranges(text).single()
+        assertEquals(QiqBlockType.IF, block.type)
+    }
+
+    @Test
+    fun openerWithoutParenthesesIsNotABlock() {
+        // All openers are call/condition forms; without '(' they are not blocks.
+        assertTrue(ranges("{{ if ${'$'}x: }}body{{ endif }}").isEmpty())
+        assertTrue(ranges("{{ setSection 'a' }}body{{ endSection() }}").isEmpty())
+    }
+
+    @Test
+    fun callStyleCloserMustBeEmptyArgCall() {
+        // Only an empty-arg call closes a section/block; arguments are invalid.
+        assertTrue(ranges("{{ setSection('a') }}x{{ endSection(${'$'}x) }}").isEmpty())
+        // Empty-arg call with a trailing semicolon is accepted.
+        assertEquals(1, ranges("{{ setSection('a') }}x{{ endSection(); }}").size)
+    }
+
+    @Test
     fun outputExpressionsAreNotBlocks() {
         val text = "{{= ${'$'}title }} {{h ${'$'}body }} {{ noop() }}"
         assertTrue(ranges(text).isEmpty())
