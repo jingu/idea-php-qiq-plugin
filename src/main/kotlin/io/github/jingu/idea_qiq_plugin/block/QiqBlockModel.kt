@@ -71,6 +71,25 @@ object QiqBlockModel {
         val openers = ArrayDeque<Pending>()
         val result = ArrayList<QiqBlockRange>()
 
+        for (directive in scanDirectives(text)) {
+            accept(directive, openers, result)
+        }
+
+        result.sortBy { it.open.startOffset }
+        return result
+    }
+
+    /** A single `{{ ... }}` directive: its delimiter span, [head] keyword and trimmed [inner] text. */
+    internal data class Directive(val range: TextRange, val head: String, val inner: String)
+
+    /**
+     * Every `{{ ... }}` directive in [text], in document order.
+     *
+     * Shared by [computeBlockRanges] and the structure view so the delimiter scan
+     * and head extraction live in one place.
+     */
+    internal fun scanDirectives(text: CharSequence): List<Directive> {
+        val directives = ArrayList<Directive>()
         var i = 0
         val n = text.length
         while (i < n - 1) {
@@ -84,18 +103,18 @@ object QiqBlockModel {
                     i = nextOpen
                     continue
                 }
-                val openStart = i
                 val openEnd = closeStart + 2
                 val inner = text.subSequence(i + 2, closeStart).toString().trim()
-                accept(inner, TextRange(openStart, openEnd), openers, result)
+                // Stop at '(' (call/condition), ':' (alt-syntax opener) or ';' so a
+                // semicolon-terminated closer such as `{{ endif; }}` still yields "endif".
+                val head = inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' && it != ';' }
+                directives.add(Directive(TextRange(i, openEnd), head, inner))
                 i = openEnd
             } else {
                 i++
             }
         }
-
-        result.sortBy { it.open.startOffset }
-        return result
+        return directives
     }
 
     /**
@@ -112,32 +131,27 @@ object QiqBlockModel {
         }
 
     private fun accept(
-        inner: String,
-        delimiter: TextRange,
+        directive: Directive,
         openers: ArrayDeque<Pending>,
         result: MutableList<QiqBlockRange>,
     ) {
-        // Stop at '(' (call/condition), ':' (alt-syntax opener) or ';' so a
-        // semicolon-terminated closer such as `{{ endif; }}` still yields "endif".
-        val head = inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' && it != ';' }
-
-        val openType = QiqBlockType.forOpenHead(head)
+        val openType = QiqBlockType.forOpenHead(directive.head)
         // Every opener is a call/condition form, so it must contain '(' — this rejects
         // bare `{{ if $x: }}` / `{{ setSection 'a' }}`. if/foreach/for additionally
         // require the trailing alternative-syntax colon; testing the trailing colon
         // (not any colon) keeps a ternary `?:` in the condition from being mistaken
         // for one.
-        if (openType != null && '(' in inner && (!openType.requiresColon || inner.trimEnd().endsWith(':'))) {
-            openers.addLast(Pending(openType, delimiter))
+        if (openType != null && '(' in directive.inner && (!openType.requiresColon || directive.inner.trimEnd().endsWith(':'))) {
+            openers.addLast(Pending(openType, directive.range))
             return
         }
 
-        val closeType = QiqBlockType.forCloseHead(head) ?: return
+        val closeType = QiqBlockType.forCloseHead(directive.head) ?: return
         // setSection/setBlock are call-style: only an empty-arg call closes them
         // (`{{ endSection() }}`, optional trailing `;`). Anything else — no parens,
         // or arguments — is invalid and must not pair.
         if ((closeType == QiqBlockType.SECTION || closeType == QiqBlockType.BLOCK) &&
-            !isEmptyArgClose(inner, closeType)
+            !isEmptyArgClose(directive.inner, closeType)
         ) {
             return
         }
@@ -147,7 +161,7 @@ object QiqBlockModel {
         val opener = openers[matchIndex]
         // Drop the matched opener and any inner blocks left unclosed above it.
         while (openers.size > matchIndex) openers.removeLast()
-        result.add(QiqBlockRange(closeType, opener.delimiter, delimiter))
+        result.add(QiqBlockRange(closeType, opener.delimiter, directive.range))
     }
 
     /** True if [inner] is an empty-arg call closer, e.g. `endSection()` / `endBlock() ;`. */

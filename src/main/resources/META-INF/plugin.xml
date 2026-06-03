@@ -67,6 +67,13 @@
         <highlightUsagesHandlerFactory
                 implementation="io.github.jingu.idea_qiq_plugin.editor.QiqBlockPairHighlightUsagesHandlerFactory"/>
 
+        <!-- Structure tool-window outline: sections/blocks and control blocks
+             (if/foreach/for) nested via the shared block-range model, plus
+             top-level setLayout()/extends() directives. -->
+        <lang.psiStructureViewFactory
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.structure.QiqStructureViewFactory"/>
+
         <!-- Color Settings Page -->
         <colorSettingsPage implementation="io.github.jingu.idea_qiq_plugin.ui.QiqColorSettingsPage"/>
 
