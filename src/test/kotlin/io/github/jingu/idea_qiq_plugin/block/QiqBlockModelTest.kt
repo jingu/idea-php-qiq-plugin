@@ -238,6 +238,60 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun validateAcceptsWellFormedNesting() {
+        val text = """
+            {{ setSection('a') }}
+            {{ if (${'$'}x): }}
+            {{ foreach (${'$'}xs as ${'$'}y): }}
+            x
+            {{ endforeach }}
+            {{ endif }}
+            {{ endSection() }}
+        """.trimIndent()
+
+        assertTrue(QiqBlockModel.validate(text).isEmpty())
+    }
+
+    @Test
+    fun validateFlagsUnclosedOpener() {
+        val text = "{{ if (${'$'}x): }}\n<p>no end</p>"
+        val problem = QiqBlockModel.validate(text).single()
+        assertEquals(QiqBlockProblem.Kind.UNCLOSED_OPENER, problem.kind)
+        assertEquals(QiqBlockType.IF, problem.type)
+        assertEquals(text.indexOf("{{ if"), problem.range.startOffset)
+    }
+
+    @Test
+    fun validateFlagsUnmatchedCloser() {
+        val text = "<p>x</p>\n{{ endif }}"
+        val problem = QiqBlockModel.validate(text).single()
+        assertEquals(QiqBlockProblem.Kind.UNMATCHED_CLOSER, problem.kind)
+        assertEquals(QiqBlockType.IF, problem.type)
+    }
+
+    @Test
+    fun validateFlagsMismatchedCloser() {
+        // foreach opened, endif seen: endif matches no open block (mismatch),
+        // and the foreach is left unclosed.
+        val text = "{{ foreach (${'$'}xs as ${'$'}y): }}\nx\n{{ endif }}"
+        val problems = QiqBlockModel.validate(text)
+        val mismatch = problems.single { it.kind == QiqBlockProblem.Kind.MISMATCHED_CLOSER }
+        assertEquals(QiqBlockType.IF, mismatch.type)
+        assertEquals(QiqBlockType.FOREACH, mismatch.expected)
+        assertTrue(problems.any { it.kind == QiqBlockProblem.Kind.UNCLOSED_OPENER && it.type == QiqBlockType.FOREACH })
+    }
+
+    @Test
+    fun validateFlagsInnerUnclosedOnWrongNesting() {
+        // The inner foreach is never closed; the endif still closes the if.
+        val text = "{{ if (${'$'}x): }}\n{{ foreach (${'$'}xs as ${'$'}y): }}\n{{ endif }}"
+        val problems = QiqBlockModel.validate(text)
+        assertEquals(1, problems.size)
+        assertEquals(QiqBlockProblem.Kind.UNCLOSED_OPENER, problems[0].kind)
+        assertEquals(QiqBlockType.FOREACH, problems[0].type)
+    }
+
+    @Test
     fun bodyRangeExcludesDelimiters() {
         val text = "{{ if (${'$'}x): }}BODY{{ endif }}"
         val block = ranges(text).single()

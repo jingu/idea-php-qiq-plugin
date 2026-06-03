@@ -74,6 +74,17 @@
                 language="Qiq"
                 implementationClass="io.github.jingu.idea_qiq_plugin.structure.QiqStructureViewFactory"/>
 
+        <!-- Warn on structurally invalid Qiq blocks: unclosed openers, closers
+             with no opener, and closers that do not match the nearest open
+             block. Shares the block-range model with folding/matching/structure. -->
+        <localInspection
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqBlockDirectiveInspection"
+                groupKey="inspection.group.qiq"
+                key="inspection.block.directive.name"
+                enabledByDefault="true"
+                level="WARNING"/>
+
         <!-- Color Settings Page -->
         <colorSettingsPage implementation="io.github.jingu.idea_qiq_plugin.ui.QiqColorSettingsPage"/>
 
