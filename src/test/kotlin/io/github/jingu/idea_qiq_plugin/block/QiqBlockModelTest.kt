@@ -1,0 +1,137 @@
+package io.github.jingu.idea_qiq_plugin.block
+
+import com.intellij.openapi.util.TextRange
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class QiqBlockModelTest {
+
+    private fun ranges(text: String) = QiqBlockModel.computeBlockRanges(text)
+
+    /** Convenience: the opener/closer delimiter substrings of a matched block. */
+    private fun QiqBlockRange.openText(text: String) = text.substring(open.startOffset, open.endOffset)
+    private fun QiqBlockRange.closeText(text: String) = text.substring(close.startOffset, close.endOffset)
+
+    @Test
+    fun pairsIfWithEndif() {
+        val text = """
+            {{ if (${'$'}x): }}
+            <p>hi</p>
+            {{ endif }}
+        """.trimIndent()
+
+        val blocks = ranges(text)
+        assertEquals(1, blocks.size)
+        assertEquals(QiqBlockType.IF, blocks[0].type)
+        assertEquals("{{ if (${'$'}x): }}", blocks[0].openText(text))
+        assertEquals("{{ endif }}", blocks[0].closeText(text))
+    }
+
+    @Test
+    fun ignoresIfWithoutColon() {
+        // No alternative-syntax colon => not a block opener.
+        val text = "{{ if (${'$'}x) }}<p>hi</p>{{ endif }}"
+        assertTrue(ranges(text).isEmpty())
+    }
+
+    @Test
+    fun pairsForeachAndFor() {
+        val text = """
+            {{ foreach (${'$'}items as ${'$'}i): }}
+            {{ for (${'$'}n = 0; ${'$'}n < 3; ${'$'}n++): }}
+            x
+            {{ endfor }}
+            {{ endforeach }}
+        """.trimIndent()
+
+        val blocks = ranges(text)
+        assertEquals(2, blocks.size)
+        // sorted by opener offset: foreach first, then the inner for
+        assertEquals(QiqBlockType.FOREACH, blocks[0].type)
+        assertEquals(QiqBlockType.FOR, blocks[1].type)
+    }
+
+    @Test
+    fun pairsSectionAndBlockCalls() {
+        val text = """
+            {{ setSection('header') }}
+            <h1>title</h1>
+            {{ endSection() }}
+            {{ setBlock('body') }}
+            content
+            {{ endBlock() }}
+        """.trimIndent()
+
+        val blocks = ranges(text)
+        assertEquals(2, blocks.size)
+        assertEquals(QiqBlockType.SECTION, blocks[0].type)
+        assertEquals(QiqBlockType.BLOCK, blocks[1].type)
+    }
+
+    @Test
+    fun nestedSameTypeMatchesNearestPartner() {
+        val text = """
+            {{ if (${'$'}a): }}
+            {{ if (${'$'}b): }}
+            inner
+            {{ endif }}
+            {{ endif }}
+        """.trimIndent()
+
+        val blocks = ranges(text).sortedBy { it.open.startOffset }
+        assertEquals(2, blocks.size)
+
+        val outer = blocks[0]
+        val inner = blocks[1]
+        // The inner opener's closer is the FIRST endif; the outer's is the second.
+        assertTrue(inner.close.startOffset < outer.close.startOffset)
+        // Proper nesting: inner block is fully contained in the outer body.
+        assertTrue(outer.bodyRange.contains(inner.fullRange))
+    }
+
+    @Test
+    fun unclosedOpenerProducesNoRange() {
+        val text = """
+            {{ if (${'$'}x): }}
+            <p>no closer here</p>
+        """.trimIndent()
+        assertTrue(ranges(text).isEmpty())
+    }
+
+    @Test
+    fun unmatchedCloserProducesNoRange() {
+        val text = "<p>stray</p>\n{{ endif }}"
+        assertTrue(ranges(text).isEmpty())
+    }
+
+    @Test
+    fun elseInsideIfIsNotABoundary() {
+        val text = """
+            {{ if (${'$'}x): }}
+            a
+            {{ else: }}
+            b
+            {{ endif }}
+        """.trimIndent()
+
+        val blocks = ranges(text)
+        assertEquals(1, blocks.size)
+        // The single if/endif spans across the else branch.
+        val block = blocks[0]
+        assertTrue(block.bodyRange.contains(text.indexOf("{{ else: }}")))
+    }
+
+    @Test
+    fun outputExpressionsAreNotBlocks() {
+        val text = "{{= ${'$'}title }} {{h ${'$'}body }} {{ noop() }}"
+        assertTrue(ranges(text).isEmpty())
+    }
+
+    @Test
+    fun bodyRangeExcludesDelimiters() {
+        val text = "{{ if (${'$'}x): }}BODY{{ endif }}"
+        val block = ranges(text).single()
+        assertEquals(TextRange(text.indexOf("BODY"), text.indexOf("BODY") + "BODY".length), block.bodyRange)
+    }
+}

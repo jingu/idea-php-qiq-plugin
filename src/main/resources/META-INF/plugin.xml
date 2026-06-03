@@ -45,6 +45,14 @@
         <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
         <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
 
+        <!-- Code folding for Qiq block directives ({{ if }}/{{ endif }},
+             foreach, for, setSection, setBlock). Backed by the shared
+             block-range model so folding, block matching, and the structure
+             view all pair openers and closers the same way. -->
+        <lang.foldingBuilder
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.editor.QiqFoldingBuilder"/>
+
         <!-- Color Settings Page -->
         <colorSettingsPage implementation="io.github.jingu.idea_qiq_plugin.ui.QiqColorSettingsPage"/>
 
