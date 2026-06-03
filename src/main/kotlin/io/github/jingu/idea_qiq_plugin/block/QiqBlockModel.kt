@@ -95,12 +95,18 @@ object QiqBlockModel {
         val head = inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' }
 
         val openType = QiqBlockType.forOpenHead(head)
-        if (openType != null && (!openType.requiresColon || inner.contains(':'))) {
+        // Alternative syntax terminates the opener with a colon (`{{ if (...): }}`).
+        // Test the trailing colon, not any colon, so a ternary `?:` inside the
+        // condition does not turn a non-block `{{ if (...) }}` into a block opener.
+        if (openType != null && (!openType.requiresColon || inner.trimEnd().endsWith(':'))) {
             openers.addLast(Pending(openType, delimiter))
             return
         }
 
         val closeType = QiqBlockType.forCloseHead(head) ?: return
+        // setSection/setBlock are call-style, so their closers need parentheses;
+        // `{{ endSection }}` (no parens) is invalid PHP and is not a valid closer.
+        if ((closeType == QiqBlockType.SECTION || closeType == QiqBlockType.BLOCK) && '(' !in inner) return
         val matchIndex = openers.indexOfLast { it.type == closeType }
         if (matchIndex < 0) return // unmatched closer
 

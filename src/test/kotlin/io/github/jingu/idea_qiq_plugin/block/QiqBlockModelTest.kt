@@ -123,6 +123,24 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun ternaryColonDoesNotMakeNonBlockIfABlock() {
+        // The colon belongs to the ternary, not to alternative syntax: not a block.
+        val withoutAltColon = "{{ if (${'$'}a ? ${'$'}b : ${'$'}c) }}x{{ endif }}"
+        assertTrue(ranges(withoutAltColon).isEmpty())
+
+        // The same condition WITH the trailing alternative-syntax colon is a block.
+        val withAltColon = "{{ if (${'$'}a ? ${'$'}b : ${'$'}c): }}x{{ endif }}"
+        assertEquals(1, ranges(withAltColon).size)
+    }
+
+    @Test
+    fun callStyleCloserWithoutParensIsNotACloser() {
+        // `{{ endSection }}` without parentheses is invalid; the section stays unclosed.
+        val text = "{{ setSection('a') }}x{{ endSection }}"
+        assertTrue(ranges(text).isEmpty())
+    }
+
+    @Test
     fun outputExpressionsAreNotBlocks() {
         val text = "{{= ${'$'}title }} {{h ${'$'}body }} {{ noop() }}"
         assertTrue(ranges(text).isEmpty())
