@@ -173,21 +173,26 @@
     </actions>
     <change-notes><![CDATA[
 <ul>
-  <li><b>Go to Declaration for Qiq helpers</b>
+  <li><b>Custom helper name completion</b>
     <ul>
-      <li>Cmd/Ctrl+click on a helper call (<code>{{ helperName(...) }}</code> or <code>{{ $this-&gt;helperName(...) }}</code>) now jumps to the helper's PHP declaration.</li>
-      <li><b>Qiq 2.x / 3.x</b>: public methods on a <code>Qiq\Helpers</code> subclass (the official custom-helper style) are discovered automatically &mdash; no configuration needed.</li>
-      <li><b>Qiq 1.x</b>: helpers registered via <code>HelperLocator::set('name', ...)</code> resolve once you point the plugin at your registration file(s) under <i>Settings &gt; Languages &amp; Frameworks &gt; Qiq Templates &gt; Helper Locator bootstrap files</i>.</li>
+      <li>Custom helper names complete at call positions inside Qiq templates (<code>{{ helperName| }}</code> / <code>{{ $this-&gt;helperName| }}</code>), covering Qiq 1.x <code>HelperLocator::set()</code> registrations and 2.x/3.x <code>Qiq\Helpers</code> subclass methods. Matching is case-insensitive, and the call parentheses are inserted for you.</li>
     </ul>
   </li>
-  <li><b>Fewer false &ldquo;undefined function/method&rdquo; warnings</b>
+  <li><b>Helper-call code insight</b>
     <ul>
-      <li>Resolvable helper calls inside Qiq templates no longer trigger PhpStorm's undefined function/method inspection.</li>
+      <li><b>Parameter info</b> (Cmd/Ctrl+P and the popup after <code>(</code>) shows the resolved helper's signature.</li>
+      <li><b>Argument inspection</b> warns on the wrong number of arguments and on positional type mismatches, delegating type compatibility to PhpStorm (inheritance, unions, nullables); under the strict-types option a non-nullable scalar also rejects <code>null</code>. Conservative &mdash; named/spread arguments and not-fully-known types are skipped.</li>
+      <li><b>Quick Documentation</b> (Cmd/Ctrl+Q, hover) for a helper call points at the resolved helper declaration.</li>
     </ul>
   </li>
-  <li><b>Fix: raw-echo helper names</b>
+  <li><b>Template path completion</b>
     <ul>
-      <li><code>{{= asset(...) }}</code> and other <code>{{= }}</code> calls whose names start with <code>h</code>/<code>a</code>/<code>j</code>/<code>u</code>/<code>c</code> (e.g. <code>asset</code>, <code>currentUrl</code>, <code>upper</code>) are no longer mis-parsed by stripping the leading letter as an escape modifier.</li>
+      <li>The path argument of <code>setLayout()</code> / <code>render()</code> / <code>extends()</code> / <code>include()</code> completes from the discovered template roots. Both relative paths and Qiq root-absolute paths (<code>/layout/base</code>) are offered, the leading <code>/</code> is optional, and matching is substring-based (<code>partial/ad</code> finds <code>/partial/ad/adtag</code>).</li>
+    </ul>
+  </li>
+  <li><b>Missing-template warning</b>
+    <ul>
+      <li>A template-referencing call whose path resolves to no file is flagged, using the same resolver as Go to Declaration &mdash; so a path is warned about exactly when Cmd/Ctrl+click would fail to navigate.</li>
     </ul>
   </li>
 </ul>
