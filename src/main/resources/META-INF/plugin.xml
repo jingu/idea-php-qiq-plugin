@@ -53,6 +53,20 @@
                 language="Qiq"
                 implementationClass="io.github.jingu.idea_qiq_plugin.editor.QiqFoldingBuilder"/>
 
+        <!-- Brace matching for Qiq delimiters: {{ / {{= / {{h / {{a / {{c /
+             {{j / {{u against the closing }}. Scoped to the Qiq layer so a
+             delimiter never pairs with a brace from injected PHP or HTML. -->
+        <lang.braceMatcher
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.editor.QiqBraceMatcher"/>
+
+        <!-- Block-pair highlighting: caret on {{ if }}/{{ endif }} (and
+             foreach/for/setSection/setBlock) highlights its partner. Uses the
+             shared block-range model so nested same-keyword blocks match the
+             correct partner. -->
+        <highlightUsagesHandlerFactory
+                implementation="io.github.jingu.idea_qiq_plugin.editor.QiqBlockPairHighlightUsagesHandlerFactory"/>
+
         <!-- Color Settings Page -->
         <colorSettingsPage implementation="io.github.jingu.idea_qiq_plugin.ui.QiqColorSettingsPage"/>
 
