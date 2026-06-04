@@ -106,6 +106,16 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun unclosedOpenerDoesNotSwallowLaterBlocks() {
+        // A half-typed `{{ if (` (no `}}`) must not consume the following block:
+        // the scanner skips it and still pairs the later setSection/endSection.
+        val text = "{{ if (\n{{ setSection('a') }}\nx\n{{ endSection() }}"
+        val blocks = ranges(text)
+        assertEquals(1, blocks.size)
+        assertEquals(QiqBlockType.SECTION, blocks[0].type)
+    }
+
+    @Test
     fun elseInsideIfIsNotABoundary() {
         val text = """
             {{ if (${'$'}x): }}

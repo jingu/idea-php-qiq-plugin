@@ -76,6 +76,14 @@ object QiqBlockModel {
         while (i < n - 1) {
             if (text[i] == '{' && text[i + 1] == '{') {
                 val closeStart = indexOfDoubleBrace(text, i + 2) ?: break
+                // If another `{{` opens before this one's `}}`, this opener is unclosed
+                // (e.g. a half-typed `{{ if (` mid-edit). Skip it and resume at the inner
+                // `{{` so the later, well-formed directives are still detected.
+                val nextOpen = indexOfDoubleOpen(text, i + 2)
+                if (nextOpen != null && nextOpen < closeStart) {
+                    i = nextOpen
+                    continue
+                }
                 val openStart = i
                 val openEnd = closeStart + 2
                 val inner = text.subSequence(i + 2, closeStart).toString().trim()
@@ -135,6 +143,15 @@ object QiqBlockModel {
         var j = from
         while (j < text.length - 1) {
             if (text[j] == '}' && text[j + 1] == '}') return j
+            j++
+        }
+        return null
+    }
+
+    private fun indexOfDoubleOpen(text: CharSequence, from: Int): Int? {
+        var j = from
+        while (j < text.length - 1) {
+            if (text[j] == '{' && text[j + 1] == '{') return j
             j++
         }
         return null
