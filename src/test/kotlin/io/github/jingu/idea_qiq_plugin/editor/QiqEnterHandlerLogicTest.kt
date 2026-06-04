@@ -16,10 +16,7 @@ class QiqEnterHandlerLogicTest {
             {{ endSection() }}
         """.trimIndent()
 
-        val openOffset = text.indexOf("}}") + 2
-        val hasCloser = handler.hasMatchingCloser(text, openOffset, "setSection", "endSection()")
-
-        assertTrue(hasCloser)
+        assertTrue(handler.isOpenerClosed(text, text.indexOf("{{ setSection")))
     }
 
     @Test
@@ -29,9 +26,15 @@ class QiqEnterHandlerLogicTest {
             <p>content</p>
         """.trimIndent()
 
-        val openOffset = text.indexOf("}}") + 2
-        val hasCloser = handler.hasMatchingCloser(text, openOffset, "setSection", "endSection()")
+        assertFalse(handler.isOpenerClosed(text, text.indexOf("{{ setSection")))
+    }
 
-        assertFalse(hasCloser)
+    @Test
+    fun semicolonTerminatedCloserCountsAsClosed() {
+        // Regression: {{ endif; }} must be recognised as the closer so Enter does
+        // not insert a duplicate {{ endif }}.
+        val text = "{{ if (\$x): }}\nbody\n{{ endif; }}"
+
+        assertTrue(handler.isOpenerClosed(text, text.indexOf("{{ if")))
     }
 }

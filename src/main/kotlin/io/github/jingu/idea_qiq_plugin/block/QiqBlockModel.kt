@@ -128,10 +128,7 @@ object QiqBlockModel {
                 }
                 val openEnd = closeStart + 2
                 val inner = text.subSequence(i + 2, closeStart).toString().trim()
-                // Stop at '(' (call/condition), ':' (alt-syntax opener) or ';' so a
-                // semicolon-terminated closer such as `{{ endif; }}` still yields "endif".
-                val head = inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' && it != ';' }
-                directives.add(Directive(TextRange(i, openEnd), head, inner))
+                directives.add(Directive(TextRange(i, openEnd), headOf(inner), inner))
                 i = openEnd
             } else {
                 i++
@@ -163,7 +160,7 @@ object QiqBlockModel {
         val problems = ArrayList<QiqBlockProblem>()
 
         for (directive in scanDirectives(text)) {
-            val openType = openTypeOf(directive)
+            val openType = openerTypeOf(directive.inner)
             if (openType != null) {
                 openers.addLast(Pending(openType, directive.range))
                 continue
@@ -212,7 +209,7 @@ object QiqBlockModel {
         openers: ArrayDeque<Pending>,
         result: MutableList<QiqBlockRange>,
     ) {
-        val openType = openTypeOf(directive)
+        val openType = openerTypeOf(directive.inner)
         if (openType != null) {
             openers.addLast(Pending(openType, directive.range))
             return
@@ -229,18 +226,26 @@ object QiqBlockModel {
     }
 
     /**
-     * The block type this directive opens, or null. Every opener is a call/condition
-     * form whose '(' follows the head directly (whitespace allowed); requiring it there
-     * rejects bare `{{ if $x: }}` / `{{ setSection 'a' }}` and avoids a false positive
-     * when an inner call supplies the '(' (e.g. `{{ if $x && foo(): }}`). if/foreach/for
-     * additionally require the trailing alternative-syntax colon; testing the trailing
-     * colon (not any colon) keeps a ternary `?:` from being mistaken for one.
+     * The block type an opener `{{ ... }}` whose content is [inner] opens, or null if
+     * [inner] is not a block opener.
+     *
+     * Every opener is a call/condition form whose '(' follows the head directly
+     * (whitespace allowed); requiring it there rejects bare `{{ if $x: }}` /
+     * `{{ setSection 'a' }}` and avoids a false positive when an inner call supplies the
+     * '(' (e.g. `{{ if $x && foo(): }}`). if/foreach/for additionally require the
+     * trailing alternative-syntax colon; testing the trailing colon (not any colon)
+     * keeps a ternary `?:` from being mistaken for one.
+     *
+     * The single source of truth for "is this a block opener", shared by the block
+     * pairing here and [io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler].
      */
-    private fun openTypeOf(directive: Directive): QiqBlockType? =
-        QiqBlockType.forOpenHead(directive.head)?.takeIf {
-            directive.inner.substring(directive.head.length).trimStart().startsWith("(") &&
-                (!it.requiresColon || directive.inner.trimEnd().endsWith(':'))
+    fun openerTypeOf(inner: String): QiqBlockType? {
+        val head = headOf(inner)
+        return QiqBlockType.forOpenHead(head)?.takeIf {
+            inner.substring(head.length).trimStart().startsWith("(") &&
+                (!it.requiresColon || inner.trimEnd().endsWith(':'))
         }
+    }
 
     /**
      * The block type this directive closes, or null. `setSection`/`setBlock` are
@@ -258,6 +263,14 @@ object QiqBlockModel {
     /** True if [inner] is an empty-arg call closer, e.g. `endSection()` / `endBlock() ;`. */
     private fun isEmptyArgClose(inner: String, type: QiqBlockType): Boolean =
         Regex("""(?i)${Regex.escape(type.closeHead)}\s*\(\s*\)\s*;?""").matches(inner)
+
+    /**
+     * The leading keyword of a directive's [inner] text. Stops at '(' (call/condition),
+     * ':' (alt-syntax opener) or ';' so a semicolon-terminated closer such as
+     * `{{ endif; }}` still yields "endif".
+     */
+    private fun headOf(inner: String): String =
+        inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' && it != ';' }
 
     private fun indexOfDoubleBrace(text: CharSequence, from: Int): Int? {
         var j = from
