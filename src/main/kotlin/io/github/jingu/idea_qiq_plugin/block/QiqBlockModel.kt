@@ -17,13 +17,14 @@ import java.util.Locale
 enum class QiqBlockType(
     val openHead: String,
     val closeHead: String,
+    val closeText: String,
     val requiresColon: Boolean,
 ) {
-    IF("if", "endif", true),
-    FOREACH("foreach", "endforeach", true),
-    FOR("for", "endfor", true),
-    SECTION("setSection", "endSection", false),
-    BLOCK("setBlock", "endBlock", false);
+    IF("if", "endif", "endif", true),
+    FOREACH("foreach", "endforeach", "endforeach", true),
+    FOR("for", "endfor", "endfor", true),
+    SECTION("setSection", "endSection", "endSection()", false),
+    BLOCK("setBlock", "endBlock", "endBlock()", false);
 
     companion object {
         private val byOpenHead = entries.associateBy { it.openHead.lowercase(Locale.ROOT) }
@@ -49,6 +50,28 @@ data class QiqBlockRange(
 
     /** The whole block, from the start of the opener to the end of the closer. */
     val fullRange: TextRange get() = TextRange(open.startOffset, close.endOffset)
+}
+
+/** A structurally invalid block directive found by [QiqBlockModel.validate]. */
+data class QiqBlockProblem(
+    val kind: Kind,
+    /** The offending `{{ ... }}` delimiter span. */
+    val range: TextRange,
+    /** The offending directive's own block type. */
+    val type: QiqBlockType,
+    /** For [Kind.MISMATCHED_CLOSER]: the nearest open block the closer failed to match. */
+    val expected: QiqBlockType? = null,
+) {
+    enum class Kind {
+        /** An opener that is never closed. */
+        UNCLOSED_OPENER,
+
+        /** A closer with no open block at all. */
+        UNMATCHED_CLOSER,
+
+        /** A closer whose type matches no open block, while a different block is open. */
+        MISMATCHED_CLOSER,
+    }
 }
 
 /**
@@ -130,35 +153,72 @@ object QiqBlockModel {
                 offset in block.close.startOffset..block.close.endOffset
         }
 
+    /**
+     * Report every structurally invalid block directive in [text]: openers that are
+     * never closed, closers with no opener, and closers that match no open block
+     * while a different block is open. Well-formed nested blocks produce nothing.
+     */
+    fun validate(text: CharSequence): List<QiqBlockProblem> {
+        val openers = ArrayDeque<Pending>()
+        val problems = ArrayList<QiqBlockProblem>()
+
+        for (directive in scanDirectives(text)) {
+            val openType = openTypeOf(directive)
+            if (openType != null) {
+                openers.addLast(Pending(openType, directive.range))
+                continue
+            }
+
+            val closeType = closeTypeOf(directive) ?: continue
+            if (openers.isEmpty()) {
+                problems.add(QiqBlockProblem(QiqBlockProblem.Kind.UNMATCHED_CLOSER, directive.range, closeType))
+                continue
+            }
+            if (openers.last().type == closeType) {
+                openers.removeLast() // proper match
+                continue
+            }
+
+            val matchIndex = openers.indexOfLast { it.type == closeType }
+            if (matchIndex >= 0) {
+                // A matching opener is open deeper down; the inner ones above it are unclosed.
+                for (k in openers.indices.reversed()) {
+                    if (k <= matchIndex) break
+                    problems.add(QiqBlockProblem(QiqBlockProblem.Kind.UNCLOSED_OPENER, openers[k].delimiter, openers[k].type))
+                }
+                while (openers.size > matchIndex) openers.removeLast()
+            } else {
+                // No opener of this type anywhere: the closer is wrong for the nearest opener.
+                problems.add(
+                    QiqBlockProblem(
+                        QiqBlockProblem.Kind.MISMATCHED_CLOSER,
+                        directive.range,
+                        closeType,
+                        expected = openers.last().type,
+                    ),
+                )
+            }
+        }
+
+        for (opener in openers) {
+            problems.add(QiqBlockProblem(QiqBlockProblem.Kind.UNCLOSED_OPENER, opener.delimiter, opener.type))
+        }
+
+        return problems.sortedBy { it.range.startOffset }
+    }
+
     private fun accept(
         directive: Directive,
         openers: ArrayDeque<Pending>,
         result: MutableList<QiqBlockRange>,
     ) {
-        val openType = QiqBlockType.forOpenHead(directive.head)
-        // Every opener is a call/condition form whose '(' follows the head directly
-        // (whitespace allowed). Requiring the '(' right after the head rejects bare
-        // `{{ if $x: }}` / `{{ setSection 'a' }}` and avoids a false positive when an
-        // inner call supplies the '(' (e.g. `{{ if $x && foo(): }}`). if/foreach/for
-        // additionally require the trailing alternative-syntax colon; testing the
-        // trailing colon (not any colon) keeps a ternary `?:` from being mistaken for one.
-        if (openType != null &&
-            directive.inner.substring(directive.head.length).trimStart().startsWith("(") &&
-            (!openType.requiresColon || directive.inner.trimEnd().endsWith(':'))
-        ) {
+        val openType = openTypeOf(directive)
+        if (openType != null) {
             openers.addLast(Pending(openType, directive.range))
             return
         }
 
-        val closeType = QiqBlockType.forCloseHead(directive.head) ?: return
-        // setSection/setBlock are call-style: only an empty-arg call closes them
-        // (`{{ endSection() }}`, optional trailing `;`). Anything else — no parens,
-        // or arguments — is invalid and must not pair.
-        if ((closeType == QiqBlockType.SECTION || closeType == QiqBlockType.BLOCK) &&
-            !isEmptyArgClose(directive.inner, closeType)
-        ) {
-            return
-        }
+        val closeType = closeTypeOf(directive) ?: return
         val matchIndex = openers.indexOfLast { it.type == closeType }
         if (matchIndex < 0) return // unmatched closer
 
@@ -166,6 +226,33 @@ object QiqBlockModel {
         // Drop the matched opener and any inner blocks left unclosed above it.
         while (openers.size > matchIndex) openers.removeLast()
         result.add(QiqBlockRange(closeType, opener.delimiter, directive.range))
+    }
+
+    /**
+     * The block type this directive opens, or null. Every opener is a call/condition
+     * form whose '(' follows the head directly (whitespace allowed); requiring it there
+     * rejects bare `{{ if $x: }}` / `{{ setSection 'a' }}` and avoids a false positive
+     * when an inner call supplies the '(' (e.g. `{{ if $x && foo(): }}`). if/foreach/for
+     * additionally require the trailing alternative-syntax colon; testing the trailing
+     * colon (not any colon) keeps a ternary `?:` from being mistaken for one.
+     */
+    private fun openTypeOf(directive: Directive): QiqBlockType? =
+        QiqBlockType.forOpenHead(directive.head)?.takeIf {
+            directive.inner.substring(directive.head.length).trimStart().startsWith("(") &&
+                (!it.requiresColon || directive.inner.trimEnd().endsWith(':'))
+        }
+
+    /**
+     * The block type this directive closes, or null. `setSection`/`setBlock` are
+     * call-style: only an empty-arg call (`endSection()` / `endBlock()`, optional
+     * trailing `;`) closes them; no parens, or arguments, is invalid and must not pair.
+     */
+    private fun closeTypeOf(directive: Directive): QiqBlockType? {
+        val type = QiqBlockType.forCloseHead(directive.head) ?: return null
+        if ((type == QiqBlockType.SECTION || type == QiqBlockType.BLOCK) && !isEmptyArgClose(directive.inner, type)) {
+            return null
+        }
+        return type
     }
 
     /** True if [inner] is an empty-arg call closer, e.g. `endSection()` / `endBlock() ;`. */
