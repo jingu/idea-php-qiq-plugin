@@ -181,9 +181,60 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun pairsSemicolonTerminatedClosers() {
+        // `{{ endif; }}` is syntactically allowed; the trailing semicolon must
+        // not prevent the closer from being recognised.
+        val text = """
+            {{ if (${'$'}x): }}body{{ endif; }}
+            {{ foreach (${'$'}xs as ${'$'}x): }}b{{ endforeach; }}
+            {{ for (${'$'}i = 0; ${'$'}i < 3; ${'$'}i++): }}c{{ endfor; }}
+        """.trimIndent()
+
+        val blocks = ranges(text)
+        assertEquals(3, blocks.size)
+        assertEquals(setOf(QiqBlockType.IF, QiqBlockType.FOREACH, QiqBlockType.FOR), blocks.map { it.type }.toSet())
+    }
+
+    @Test
     fun outputExpressionsAreNotBlocks() {
         val text = "{{= ${'$'}title }} {{h ${'$'}body }} {{ noop() }}"
         assertTrue(ranges(text).isEmpty())
+    }
+
+    @Test
+    fun blockAtDelimiterResolvesFromOpenerAndCloser() {
+        val text = """
+            {{ if (${'$'}x): }}
+            body
+            {{ endif }}
+        """.trimIndent()
+
+        val onOpener = QiqBlockModel.blockAtDelimiter(text, text.indexOf("if"))
+        val onCloser = QiqBlockModel.blockAtDelimiter(text, text.indexOf("endif"))
+        val inBody = QiqBlockModel.blockAtDelimiter(text, text.indexOf("body"))
+
+        assertEquals(QiqBlockType.IF, onOpener?.type)
+        // Caret on either delimiter resolves to the same block.
+        assertEquals(onOpener, onCloser)
+        assertEquals(null, inBody)
+    }
+
+    @Test
+    fun blockAtDelimiterPicksInnerNestedBlock() {
+        val text = """
+            {{ if (${'$'}a): }}
+            {{ if (${'$'}b): }}
+            inner
+            {{ endif }}
+            {{ endif }}
+        """.trimIndent()
+
+        // The first endif closes the inner block.
+        val firstEndif = text.indexOf("{{ endif }}")
+        val block = QiqBlockModel.blockAtDelimiter(text, firstEndif + 3)
+
+        // Its opener is the SECOND `if (` (the inner one), not the outer.
+        assertEquals(text.indexOf("if (${'$'}b)") - 3, block?.open?.startOffset)
     }
 
     @Test

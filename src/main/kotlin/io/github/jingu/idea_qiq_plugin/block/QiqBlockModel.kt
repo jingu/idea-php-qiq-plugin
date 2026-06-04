@@ -98,13 +98,28 @@ object QiqBlockModel {
         return result
     }
 
+    /**
+     * The block whose opener or closer delimiter [offset] falls on, if any.
+     *
+     * A delimiter spans `{{ ... }}` inclusive of both ends, so a caret resting at
+     * either edge of an opener or closer still resolves to its block. Used to drive
+     * block-pair highlighting.
+     */
+    fun blockAtDelimiter(text: CharSequence, offset: Int): QiqBlockRange? =
+        computeBlockRanges(text).firstOrNull { block ->
+            offset in block.open.startOffset..block.open.endOffset ||
+                offset in block.close.startOffset..block.close.endOffset
+        }
+
     private fun accept(
         inner: String,
         delimiter: TextRange,
         openers: ArrayDeque<Pending>,
         result: MutableList<QiqBlockRange>,
     ) {
-        val head = inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' }
+        // Stop at '(' (call/condition), ':' (alt-syntax opener) or ';' so a
+        // semicolon-terminated closer such as `{{ endif; }}` still yields "endif".
+        val head = inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' && it != ';' }
 
         val openType = QiqBlockType.forOpenHead(head)
         // Every opener is a call/condition form whose '(' follows the head directly
