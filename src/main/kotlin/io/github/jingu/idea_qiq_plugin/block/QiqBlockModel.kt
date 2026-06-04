@@ -107,12 +107,16 @@ object QiqBlockModel {
         val head = inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' }
 
         val openType = QiqBlockType.forOpenHead(head)
-        // Every opener is a call/condition form, so it must contain '(' — this rejects
-        // bare `{{ if $x: }}` / `{{ setSection 'a' }}`. if/foreach/for additionally
-        // require the trailing alternative-syntax colon; testing the trailing colon
-        // (not any colon) keeps a ternary `?:` in the condition from being mistaken
-        // for one.
-        if (openType != null && '(' in inner && (!openType.requiresColon || inner.trimEnd().endsWith(':'))) {
+        // Every opener is a call/condition form whose '(' follows the head directly
+        // (whitespace allowed). Requiring the '(' right after the head rejects bare
+        // `{{ if $x: }}` / `{{ setSection 'a' }}` and avoids a false positive when an
+        // inner call supplies the '(' (e.g. `{{ if $x && foo(): }}`). if/foreach/for
+        // additionally require the trailing alternative-syntax colon; testing the
+        // trailing colon (not any colon) keeps a ternary `?:` from being mistaken for one.
+        if (openType != null &&
+            inner.substring(head.length).trimStart().startsWith("(") &&
+            (!openType.requiresColon || inner.trimEnd().endsWith(':'))
+        ) {
             openers.addLast(Pending(openType, delimiter))
             return
         }

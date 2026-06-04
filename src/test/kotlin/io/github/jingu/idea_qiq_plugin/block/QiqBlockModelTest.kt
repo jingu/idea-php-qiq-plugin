@@ -166,6 +166,13 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun openerParenthesisMustFollowHead() {
+        // A '(' from an inner call doesn't qualify: the opener's own '(' must follow
+        // the head, so `{{ if $x && foo(): }}` (no outer parens) is not a block.
+        assertTrue(ranges("{{ if ${'$'}x && foo(): }}body{{ endif }}").isEmpty())
+    }
+
+    @Test
     fun callStyleCloserMustBeEmptyArgCall() {
         // Only an empty-arg call closes a section/block; arguments are invalid.
         assertTrue(ranges("{{ setSection('a') }}x{{ endSection(${'$'}x) }}").isEmpty())
