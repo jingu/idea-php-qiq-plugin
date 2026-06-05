@@ -238,6 +238,28 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun blockAtDelimiterUsesHalfOpenRanges() {
+        // Regression (#44): delimiter ranges are half-open [start, end), so the
+        // offset right after a closer's `}}` is outside that block.
+        val text = "{{ if (${'$'}x): }}body{{ endif }}"
+        assertEquals(null, QiqBlockModel.blockAtDelimiter(text, text.length))
+        // The last offset inside the closer still resolves.
+        assertEquals(QiqBlockType.IF, QiqBlockModel.blockAtDelimiter(text, text.length - 1)?.type)
+    }
+
+    @Test
+    fun blockAtDelimiterAdjacentDelimitersResolveToFollowingBlock() {
+        // Regression (#44): at a `}}{{` boundary the offset is the first closer's
+        // endOffset AND the second opener's startOffset; it must resolve to the
+        // following block only, never the preceding one.
+        val text = "{{ if (${'$'}a): }}x{{ endif }}{{ if (${'$'}b): }}y{{ endif }}"
+        val boundary = text.indexOf("}}{{") + 2
+
+        val block = QiqBlockModel.blockAtDelimiter(text, boundary)
+        assertEquals(text.indexOf("{{ if (${'$'}b)"), block?.open?.startOffset)
+    }
+
+    @Test
     fun validateAcceptsWellFormedNesting() {
         val text = """
             {{ setSection('a') }}

@@ -140,14 +140,14 @@ object QiqBlockModel {
     /**
      * The block whose opener or closer delimiter [offset] falls on, if any.
      *
-     * A delimiter spans `{{ ... }}` inclusive of both ends, so a caret resting at
-     * either edge of an opener or closer still resolves to its block. Used to drive
-     * block-pair highlighting.
+     * Offsets follow IntelliJ's half-open `[start, end)` semantics, so the position
+     * right after a `}}` is outside its delimiter: where two delimiters are adjacent
+     * (`}}{{`), the boundary offset resolves only to the following block. Used to
+     * drive block-pair highlighting.
      */
     fun blockAtDelimiter(text: CharSequence, offset: Int): QiqBlockRange? =
         computeBlockRanges(text).firstOrNull { block ->
-            offset in block.open.startOffset..block.open.endOffset ||
-                offset in block.close.startOffset..block.close.endOffset
+            block.open.contains(offset) || block.close.contains(offset)
         }
 
     /**
