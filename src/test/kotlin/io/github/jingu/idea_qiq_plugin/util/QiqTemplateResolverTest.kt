@@ -1,53 +1,69 @@
-package io.github.jingu.idea_qiq_plugin.completion
+package io.github.jingu.idea_qiq_plugin.util
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * Unit tests for the pure extension-stripping helper that turns a
- * root-relative template file path into the path users type in
- * `setLayout('...')` / `render('...')` etc.
- *
- * The VFS walk and completion firing are exercised manually / by the
- * planned HeavyPlatformTestCase integration suite.
+ * Unit tests for the pure path helpers of [QiqTemplateResolver] — extension
+ * stripping (file path -> typed path) and candidate generation (typed path ->
+ * files to look up). The VFS walk and the `resolve`/`listTemplatePaths` lookups
+ * are exercised manually / by the planned HeavyPlatformTestCase suite (#32).
  */
-class QiqTemplatePathCompletionContributorTest {
+class QiqTemplateResolverTest {
 
     private val exts = listOf(".qiq.php", ".qiq", ".php")
+
+    // --- stripTemplateExtension ---------------------------------------------
 
     @Test
     fun stripsLongestMatchingExtensionFirst() {
         // `.qiq.php` must win over `.php`, otherwise a dangling `.qiq` is left.
-        assertEquals(
-            "layout/base",
-            QiqTemplatePathCompletionContributor.stripTemplateExtension("layout/base.qiq.php", exts),
-        )
+        assertEquals("layout/base", QiqTemplateResolver.stripTemplateExtension("layout/base.qiq.php", exts))
     }
 
     @Test
     fun stripsPlainQiqAndPhpExtensions() {
-        assertEquals("partials/menu", QiqTemplatePathCompletionContributor.stripTemplateExtension("partials/menu.qiq", exts))
-        assertEquals("page/index", QiqTemplatePathCompletionContributor.stripTemplateExtension("page/index.php", exts))
+        assertEquals("partials/menu", QiqTemplateResolver.stripTemplateExtension("partials/menu.qiq", exts))
+        assertEquals("page/index", QiqTemplateResolver.stripTemplateExtension("page/index.php", exts))
     }
 
     @Test
     fun returnsNullForNonTemplateFiles() {
-        assertNull(QiqTemplatePathCompletionContributor.stripTemplateExtension("assets/app.css", exts))
-        assertNull(QiqTemplatePathCompletionContributor.stripTemplateExtension("README.md", exts))
+        assertNull(QiqTemplateResolver.stripTemplateExtension("assets/app.css", exts))
+        assertNull(QiqTemplateResolver.stripTemplateExtension("README.md", exts))
     }
 
     @Test
     fun isCaseInsensitiveOnExtension() {
-        assertEquals("Page/Home", QiqTemplatePathCompletionContributor.stripTemplateExtension("Page/Home.PHP", exts))
+        assertEquals("Page/Home", QiqTemplateResolver.stripTemplateExtension("Page/Home.PHP", exts))
     }
 
     @Test
     fun respectsConfiguredExtensionOrder() {
         // With only ".php" configured, a ".qiq.php" file keeps its ".qiq" stem.
+        assertEquals("layout/base.qiq", QiqTemplateResolver.stripTemplateExtension("layout/base.qiq.php", listOf(".php")))
+    }
+
+    // --- buildCandidatePaths -------------------------------------------------
+
+    @Test
+    fun appendsEachExtensionWhenPathHasNone() {
         assertEquals(
-            "layout/base.qiq",
-            QiqTemplatePathCompletionContributor.stripTemplateExtension("layout/base.qiq.php", listOf(".php")),
+            listOf("layout/base", "layout/base.qiq.php", "layout/base.qiq", "layout/base.php"),
+            QiqTemplateResolver.buildCandidatePaths("layout/base", exts),
         )
+    }
+
+    @Test
+    fun keepsPathAsIsWhenExtensionAlreadyPresent() {
+        // An explicit extension is honoured; no extra candidates are appended.
+        assertEquals(listOf("layout/base.qiq.php"), QiqTemplateResolver.buildCandidatePaths("layout/base.qiq.php", exts))
+        assertEquals(listOf("page/index.php"), QiqTemplateResolver.buildCandidatePaths("page/index.php", exts))
+    }
+
+    @Test
+    fun extensionDetectionIsCaseInsensitive() {
+        assertEquals(listOf("Page/Home.PHP"), QiqTemplateResolver.buildCandidatePaths("Page/Home.PHP", exts))
     }
 }
