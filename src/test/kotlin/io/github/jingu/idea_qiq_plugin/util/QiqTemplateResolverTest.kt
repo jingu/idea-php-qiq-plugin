@@ -103,6 +103,10 @@ class QiqTemplateResolverTest {
         assertNull(QiqTemplateResolver.normalizePath("/layout/\$name"))
         // Any embedded whitespace (not just a plain space) is dynamic.
         assertNull(QiqTemplateResolver.normalizePath("layout\tbase"))
+        // Leading/trailing whitespace is significant at runtime and not trimmed
+        // away: such a path is rejected rather than silently resolved as trimmed.
+        assertNull(QiqTemplateResolver.normalizePath(" layout/base"))
+        assertNull(QiqTemplateResolver.normalizePath("layout/base "))
     }
 
     // --- normalizeExtensions -------------------------------------------------

@@ -47,20 +47,22 @@ object QiqTemplateResolver {
             ?: DEFAULT_EXTENSIONS
 
     /**
-     * Normalize a raw template path argument, or null when it is blank or dynamic.
+     * Normalize a raw template path argument, or null when it is empty or dynamic.
      * A path is dynamic — and so not statically resolvable — when it embeds any
-     * whitespace or a `$` (PHP interpolation); rejecting both here gives every
-     * resolver consumer (navigation, inspection) the same static-path gate as
-     * [QiqTemplatePathInspection], so an interpolated `"/layout/$name"` is never
-     * resolved. Collapses runs of `/` *before* stripping the leading one, so
-     * multiple leading slashes (`///layout`) still yield a clean relative path
-     * (`layout`) rather than leaving a stray leading slash that would break
+     * whitespace (including leading/trailing, which is significant to Qiq at
+     * runtime, so it is *not* trimmed away) or a `$` (PHP interpolation). This is
+     * the single static-path gate every resolver consumer shares: navigation and
+     * [resolve] via this method, and [QiqTemplatePathInspection] which skips a
+     * path exactly when this returns null — so an interpolated `"/layout/$name"`
+     * is never resolved and never warned about. Collapses runs of `/` *before*
+     * stripping the leading one, so multiple leading slashes (`///layout`) still
+     * yield a clean relative path (`layout`) rather than leaving a stray leading
+     * slash that would break
      * [com.intellij.openapi.vfs.VirtualFile.findFileByRelativePath].
      */
     fun normalizePath(path: String): NormalizedPath? {
-        val raw = path.trim()
-        if (raw.isEmpty() || raw.any { it.isWhitespace() } || raw.contains('$')) return null
-        val collapsed = raw.replace(MULTI_SLASH, "/")
+        if (path.isEmpty() || path.any { it.isWhitespace() } || path.contains('$')) return null
+        val collapsed = path.replace(MULTI_SLASH, "/")
         val rootAbsolute = collapsed.startsWith("/")
         val relative = collapsed.removePrefix("/")
         if (relative.isEmpty()) return null
@@ -107,6 +109,10 @@ object QiqTemplateResolver {
      * The template paths to offer at a path-argument completion for [contextFile]:
      * relative paths (no leading slash) for each detected root, plus root-absolute
      * `/...` paths for the template base, each with its Qiq extension stripped.
+     *
+     * [MAX_CANDIDATES] is applied per source (each root, and the base) rather than
+     * to the merged result, so a very large root cannot exhaust the budget and
+     * drop the base-rooted `/...` suggestions (or another root) entirely.
      */
     fun listTemplatePaths(project: Project, contextFile: VirtualFile): List<String> {
         val settings = QiqSettingsService.getInstance(project) ?: return emptyList()
@@ -114,10 +120,14 @@ object QiqTemplateResolver {
         val out = LinkedHashSet<String>()
 
         for (root in settings.resolveTemplateRoots(contextFile)) {
-            collectTemplatePaths(root, root, exts, out) { it }
+            val rel = LinkedHashSet<String>()
+            collectTemplatePaths(root, root, exts, rel) { it }
+            out.addAll(rel)
         }
         settings.resolveTemplateBase(contextFile)?.let { base ->
-            collectTemplatePaths(base, base, exts, out) { "/$it" }
+            val abs = LinkedHashSet<String>()
+            collectTemplatePaths(base, base, exts, abs) { "/$it" }
+            out.addAll(abs)
         }
         return out.toList()
     }
