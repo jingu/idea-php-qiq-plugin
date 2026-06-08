@@ -213,26 +213,30 @@
     </actions>
     <change-notes><![CDATA[
 <ul>
-  <li><b>Custom helper name completion</b>
+  <li><b>Code folding for Qiq blocks</b>
     <ul>
-      <li>Custom helper names complete at call positions inside Qiq templates (<code>{{ helperName| }}</code> / <code>{{ $this-&gt;helperName| }}</code>), covering Qiq 1.x <code>HelperLocator::set()</code> registrations and 2.x/3.x <code>Qiq\Helpers</code> subclass methods. Matching is case-insensitive, and the call parentheses are inserted for you.</li>
+      <li><code>{{ if (...): }}</code>&hellip;<code>{{ endif }}</code>, <code>foreach</code>, <code>for</code>, <code>setSection</code>, and <code>setBlock</code> blocks can be collapsed. Only the body folds, so a collapsed block still reads as <code>{{ if (...): }}&hellip;{{ endif }}</code>.</li>
     </ul>
   </li>
-  <li><b>Helper-call code insight</b>
+  <li><b>Block matching &amp; brace highlighting</b>
     <ul>
-      <li><b>Parameter info</b> (Cmd/Ctrl+P and the popup after <code>(</code>) shows the resolved helper's signature.</li>
-      <li><b>Argument inspection</b> warns on the wrong number of arguments and on positional type mismatches, delegating type compatibility to PhpStorm (inheritance, unions, nullables); under the strict-types option a non-nullable scalar also rejects <code>null</code>. Conservative &mdash; named/spread arguments and not-fully-known types are skipped.</li>
-      <li><b>Quick Documentation</b> (Cmd/Ctrl+Q, hover) for a helper call points at the resolved helper declaration.</li>
+      <li>Qiq delimiters (<code>{{</code> / <code>{{=</code> / <code>{{h</code> / <code>{{a</code> / <code>{{c</code> / <code>{{j</code> / <code>{{u</code>) pair with their closing <code>}}</code>, without ever pairing against a brace from injected PHP or surrounding HTML.</li>
+      <li>Resting the caret on a block opener or closer highlights its partner directive &mdash; nested same-keyword blocks (<code>if</code> inside <code>if</code>) resolve to the correct partner.</li>
     </ul>
   </li>
-  <li><b>Template path completion</b>
+  <li><b>Structure view (outline)</b>
     <ul>
-      <li>The path argument of <code>setLayout()</code> / <code>render()</code> / <code>extends()</code> / <code>include()</code> completes from the discovered template roots. Both relative paths and Qiq root-absolute paths (<code>/layout/base</code>) are offered, the leading <code>/</code> is optional, and matching is substring-based (<code>partial/ad</code> finds <code>/partial/ad/adtag</code>).</li>
+      <li>The Structure tool window (Alt+7 / Cmd+7) shows <code>setSection</code>/<code>setBlock</code> by name, nested control blocks (<code>if</code>/<code>foreach</code>/<code>for</code>), and top-level <code>setLayout()</code>/<code>extends()</code> directives. Clicking a node navigates to the directive.</li>
     </ul>
   </li>
-  <li><b>Missing-template warning</b>
+  <li><b>Inspection: unclosed / mismatched block directives</b>
     <ul>
-      <li>A template-referencing call whose path resolves to no file is flagged, using the same resolver as Go to Declaration &mdash; so a path is warned about exactly when Cmd/Ctrl+click would fail to navigate.</li>
+      <li>Warns on an opener that is never closed (<code>{{ if (...): }}</code> without <code>{{ endif }}</code>), a closer with no opener, and a closer that does not match the nearest open block (e.g. <code>{{ foreach }}</code>&hellip;<code>{{ endif }}</code>).</li>
+    </ul>
+  </li>
+  <li><b>More accurate Enter auto-close</b>
+    <ul>
+      <li>Pressing Enter after a block opener now uses the same block pairing as folding/matching, so semicolon-terminated closers (<code>{{ endif; }}</code>) are recognised and a duplicate closer is no longer inserted.</li>
     </ul>
   </li>
 </ul>

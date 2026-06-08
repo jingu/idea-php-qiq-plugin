@@ -21,10 +21,14 @@ class QiqBraceMatcher : PairedBraceMatcherAdapter(Matcher, QiqTemplateLanguage) 
     private object Matcher : PairedBraceMatcher {
         override fun getPairs(): Array<BracePair> = PAIRS
 
+        // Never auto-insert the closing `}}` when an opening delimiter is typed:
+        // closing-delimiter completion is owned by QiqTypedHandler (`{{ ` -> ` }}`),
+        // and letting PairedBraceMatcher also insert one yields a doubled/partial
+        // closer. This only suppresses auto-insertion; pair highlighting is unaffected.
         override fun isPairedBracesAllowedBeforeType(
             lbraceType: IElementType,
             contextType: IElementType?,
-        ): Boolean = true
+        ): Boolean = false
 
         override fun getCodeConstructStart(file: PsiFile?, openingBraceOffset: Int): Int =
             openingBraceOffset
