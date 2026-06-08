@@ -3,6 +3,7 @@ package io.github.jingu.idea_qiq_plugin.structure
 import com.intellij.openapi.util.TextRange
 import io.github.jingu.idea_qiq_plugin.block.QiqBlockModel
 import io.github.jingu.idea_qiq_plugin.block.QiqBlockType
+import java.util.Locale
 
 /** The kind of outline node, used to pick a structure-view icon. */
 enum class QiqOutlineKind { DIRECTIVE, SECTION, BLOCK, CONTROL }
@@ -29,7 +30,9 @@ data class QiqOutlineNode(
  */
 object QiqOutline {
 
-    private val TOP_LEVEL_HEADS = setOf("setLayout", "extends")
+    // Lowercase: heads are matched case-insensitively, as PHP method names are
+    // (`setlayout` / `setLayout`), consistent with QiqBlockType.forOpenHead.
+    private val TOP_LEVEL_HEADS = setOf("setlayout", "extends")
     private val WHITESPACE_RUN = Regex("\\s+")
 
     fun build(text: CharSequence): List<QiqOutlineNode> {
@@ -51,7 +54,7 @@ object QiqOutline {
 
         // Leaves: standalone setLayout()/extends() directives.
         val leaves = directives
-            .filter { it.head in TOP_LEVEL_HEADS }
+            .filter { it.head.lowercase(Locale.ROOT) in TOP_LEVEL_HEADS }
             .map { Entry(it.range, MutableNode(normalize(it.inner), QiqOutlineKind.DIRECTIVE, it.range.startOffset), isContainer = false) }
 
         return assemble(containers + leaves)

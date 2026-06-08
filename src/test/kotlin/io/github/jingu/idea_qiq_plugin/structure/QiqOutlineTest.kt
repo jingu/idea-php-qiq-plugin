@@ -83,6 +83,16 @@ class QiqOutlineTest {
     }
 
     @Test
+    fun topLevelDirectiveHeadMatchesCaseInsensitively() {
+        // PHP method calls are case-insensitive: `setlayout` must surface like `setLayout`.
+        val text = "{{ setlayout('layout/base') }}\n<p>body</p>"
+        val roots = build(text)
+        assertEquals(1, roots.size)
+        assertEquals(QiqOutlineKind.DIRECTIVE, roots[0].kind)
+        assertEquals("setlayout('layout/base')", roots[0].label)
+    }
+
+    @Test
     fun unbalancedBlockIsNotShownAsContainer() {
         // No closer => not a balanced block, so it is not an outline container.
         val text = "{{ setLayout('base') }}\n{{ if (${'$'}x): }}\n<p>no end</p>"
