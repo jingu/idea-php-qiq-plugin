@@ -7,6 +7,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
+import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import io.github.jingu.idea_qiq_plugin.block.QiqBlockType
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
@@ -24,10 +25,11 @@ class QiqSectionLineMarkerProvider : RelatedItemLineMarkerProvider() {
         element: PsiElement,
         result: MutableCollection<in RelatedItemLineMarkerInfo<*>>,
     ) {
-        // Anchor on a leaf only (line markers must target leaf elements).
+        // Anchor on exactly one leaf per literal (line markers must target leaf
+        // elements), so the same name yields a single gutter icon.
         if (element.firstChild != null) return
         val literal = element.parent as? StringLiteralExpression ?: return
-        if (literal.firstChild !== element) return
+        if (PsiTreeUtil.getDeepestFirst(literal) !== element) return
         if (!QiqInjectionSupport.isInQiqFile(literal)) return
 
         val type = QiqSectionCall.writerTypeForArg(literal) ?: return
