@@ -47,15 +47,19 @@ object QiqTemplateResolver {
             ?: DEFAULT_EXTENSIONS
 
     /**
-     * Normalize a raw template path argument, or null when it is blank or dynamic
-     * (contains a space). Collapses runs of `/` *before* stripping the leading one,
-     * so multiple leading slashes (`///layout`) still yield a clean relative path
+     * Normalize a raw template path argument, or null when it is blank or dynamic.
+     * A path is dynamic — and so not statically resolvable — when it embeds any
+     * whitespace or a `$` (PHP interpolation); rejecting both here gives every
+     * resolver consumer (navigation, inspection) the same static-path gate as
+     * [QiqTemplatePathInspection], so an interpolated `"/layout/$name"` is never
+     * resolved. Collapses runs of `/` *before* stripping the leading one, so
+     * multiple leading slashes (`///layout`) still yield a clean relative path
      * (`layout`) rather than leaving a stray leading slash that would break
      * [com.intellij.openapi.vfs.VirtualFile.findFileByRelativePath].
      */
     fun normalizePath(path: String): NormalizedPath? {
         val raw = path.trim()
-        if (raw.isEmpty() || raw.contains(' ')) return null
+        if (raw.isEmpty() || raw.any { it.isWhitespace() } || raw.contains('$')) return null
         val collapsed = raw.replace(MULTI_SLASH, "/")
         val rootAbsolute = collapsed.startsWith("/")
         val relative = collapsed.removePrefix("/")

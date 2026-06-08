@@ -98,6 +98,11 @@ class QiqTemplateResolverTest {
         assertNull(QiqTemplateResolver.normalizePath("   "))
         assertNull(QiqTemplateResolver.normalizePath("/"))
         assertNull(QiqTemplateResolver.normalizePath("layout \$name"))
+        // PHP interpolation is dynamic even without a space, matching the
+        // missing-template inspection's static-path gate.
+        assertNull(QiqTemplateResolver.normalizePath("/layout/\$name"))
+        // Any embedded whitespace (not just a plain space) is dynamic.
+        assertNull(QiqTemplateResolver.normalizePath("layout\tbase"))
     }
 
     // --- normalizeExtensions -------------------------------------------------
