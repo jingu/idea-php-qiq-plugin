@@ -26,9 +26,42 @@ object QiqTemplateResolver {
     private val MULTI_SLASH = Regex("/+")
     private val DEFAULT_EXTENSIONS = listOf(".qiq.php", ".qiq", ".php")
 
-    /** The candidate template extensions from settings, with a built-in fallback. */
+    /** A normalized template path: whether it was root-absolute, and the relative remainder. */
+    data class NormalizedPath(val rootAbsolute: Boolean, val relative: String)
+
+    /** The candidate template extensions from settings, normalized, with a built-in fallback. */
     fun candidateExtensions(project: Project): List<String> =
-        QiqSettingsService.getInstance(project)?.state?.candidateExtensions ?: DEFAULT_EXTENSIONS
+        normalizeExtensions(QiqSettingsService.getInstance(project)?.state?.candidateExtensions)
+
+    /**
+     * Normalize a configured extension list: drop blanks, ensure each starts with
+     * a `.` (since [buildCandidatePaths] appends them verbatim), and fall back to
+     * the built-in defaults when the list is null *or* empty — an empty list would
+     * otherwise silently disable both completion listing and path resolution.
+     */
+    fun normalizeExtensions(configured: List<String>?): List<String> =
+        configured
+            ?.mapNotNull { it.trim().takeIf(String::isNotEmpty) }
+            ?.map { if (it.startsWith(".")) it else ".$it" }
+            ?.takeIf { it.isNotEmpty() }
+            ?: DEFAULT_EXTENSIONS
+
+    /**
+     * Normalize a raw template path argument, or null when it is blank or dynamic
+     * (contains a space). Collapses runs of `/` *before* stripping the leading one,
+     * so multiple leading slashes (`///layout`) still yield a clean relative path
+     * (`layout`) rather than leaving a stray leading slash that would break
+     * [com.intellij.openapi.vfs.VirtualFile.findFileByRelativePath].
+     */
+    fun normalizePath(path: String): NormalizedPath? {
+        val raw = path.trim()
+        if (raw.isEmpty() || raw.contains(' ')) return null
+        val collapsed = raw.replace(MULTI_SLASH, "/")
+        val rootAbsolute = collapsed.startsWith("/")
+        val relative = collapsed.removePrefix("/")
+        if (relative.isEmpty()) return null
+        return NormalizedPath(rootAbsolute, relative)
+    }
 
     /**
      * Every file a template path argument [path] resolves to, in priority order
@@ -42,20 +75,15 @@ object QiqTemplateResolver {
      * navigation result working while closing the completion/resolution gap.
      */
     fun resolve(project: Project, path: String, contextFile: VirtualFile?): List<VirtualFile> {
-        val raw = path.trim()
-        if (raw.isEmpty() || raw.contains(' ')) return emptyList()
         if (contextFile == null) return emptyList()
-
-        val rootAbsolute = raw.startsWith("/")
-        val normalized = raw.removePrefix("/").replace(MULTI_SLASH, "/")
-        if (normalized.isEmpty()) return emptyList()
+        val normalized = normalizePath(path) ?: return emptyList()
 
         val exts = candidateExtensions(project)
-        val candidates = buildCandidatePaths(normalized, exts)
+        val candidates = buildCandidatePaths(normalized.relative, exts)
         val settings = QiqSettingsService.getInstance(project)
         val out = LinkedHashSet<VirtualFile>()
 
-        if (rootAbsolute) {
+        if (normalized.rootAbsolute) {
             // Root-absolute paths resolve from the engine's template directory.
             settings?.resolveTemplateBase(contextFile)?.let { base ->
                 addMatchesUnder(base, candidates, out)

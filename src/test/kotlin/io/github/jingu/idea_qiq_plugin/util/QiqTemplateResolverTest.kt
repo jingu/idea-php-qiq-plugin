@@ -66,4 +66,56 @@ class QiqTemplateResolverTest {
     fun extensionDetectionIsCaseInsensitive() {
         assertEquals(listOf("Page/Home.PHP"), QiqTemplateResolver.buildCandidatePaths("Page/Home.PHP", exts))
     }
+
+    // --- normalizePath -------------------------------------------------------
+
+    @Test
+    fun normalizesRelativePath() {
+        val n = QiqTemplateResolver.normalizePath("layout/base")!!
+        assertEquals(false, n.rootAbsolute)
+        assertEquals("layout/base", n.relative)
+    }
+
+    @Test
+    fun normalizesRootAbsolutePath() {
+        val n = QiqTemplateResolver.normalizePath("/layout/base")!!
+        assertEquals(true, n.rootAbsolute)
+        assertEquals("layout/base", n.relative)
+    }
+
+    @Test
+    fun collapsesSlashesBeforeStrippingLeadingOne() {
+        // Multiple leading slashes must not leave a stray leading slash in the
+        // relative part (which would break findFileByRelativePath).
+        val n = QiqTemplateResolver.normalizePath("///layout//base")!!
+        assertEquals(true, n.rootAbsolute)
+        assertEquals("layout/base", n.relative)
+    }
+
+    @Test
+    fun rejectsBlankAndDynamicPaths() {
+        assertNull(QiqTemplateResolver.normalizePath(""))
+        assertNull(QiqTemplateResolver.normalizePath("   "))
+        assertNull(QiqTemplateResolver.normalizePath("/"))
+        assertNull(QiqTemplateResolver.normalizePath("layout $name"))
+    }
+
+    // --- normalizeExtensions -------------------------------------------------
+
+    @Test
+    fun fallsBackToDefaultsWhenNullOrEmpty() {
+        val defaults = listOf(".qiq.php", ".qiq", ".php")
+        assertEquals(defaults, QiqTemplateResolver.normalizeExtensions(null))
+        assertEquals(defaults, QiqTemplateResolver.normalizeExtensions(emptyList()))
+        // A list of only blanks collapses to empty -> defaults.
+        assertEquals(defaults, QiqTemplateResolver.normalizeExtensions(listOf("", "   ")))
+    }
+
+    @Test
+    fun ensuresLeadingDotAndDropsBlanks() {
+        assertEquals(
+            listOf(".qiq.php", ".php"),
+            QiqTemplateResolver.normalizeExtensions(listOf("qiq.php", "  ", ".php")),
+        )
+    }
 }
