@@ -98,6 +98,12 @@
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
 
+        <!-- Go to Declaration from a `getSection('x')` / `getBlock('x')` name to
+             the matching `setSection`/`setBlock` definitions under the detected
+             template roots (poly-variant; a name may be set by several pages). -->
+        <psi.referenceContributor
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqSectionReferenceContributor"/>
+
         <!-- Warn when setLayout()/render()/extends()/include() reference a
              template that does not exist. Uses the same resolver as Go to
              Declaration, so a path is flagged exactly when Cmd/Ctrl+click would
@@ -107,6 +113,18 @@
                 implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqTemplatePathInspection"
                 groupKey="inspection.group.qiq"
                 key="inspection.template.path.name"
+                enabledByDefault="true"
+                level="WARNING"/>
+
+        <!-- Warn when getSection('x')/getBlock('x') reads a name no
+             setSection/setBlock defines under the detected template roots.
+             Conservative: only plain string literals, and suppressed when the
+             section index is empty (roots unresolved / nothing scanned). -->
+        <localInspection
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqSectionNameInspection"
+                groupKey="inspection.group.qiq"
+                key="inspection.section.name"
                 enabledByDefault="true"
                 level="WARNING"/>
 
@@ -175,6 +193,13 @@
         <completion.contributor
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqTemplatePathCompletionContributor"/>
+
+        <!-- Complete section/block names in getSection('...')/getBlock('...')
+             from the setSection/setBlock definitions under the resolved template
+             roots. Pairs with the section-name Go to Declaration. -->
+        <completion.contributor
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqSectionNameCompletionContributor"/>
 
         <!-- ElementManipulators: required for refactorings (Rename, Move, etc.)
              to propagate edits made inside the injected PHP back to the Qiq host. -->
