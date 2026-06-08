@@ -45,9 +45,9 @@ class QiqSectionNameInspection : LocalInspectionTool() {
             ?: call.containingFile?.virtualFile
             ?: return
 
-        val all = QiqSectionIndex.allDefinitions(call.project, contextFile)
-        if (all.isEmpty()) return // nothing indexed: stay quiet rather than false-warn
-        if (all.any { it.def.type == type && it.def.name == name }) return
+        val definitions = QiqSectionIndex.index(call.project, contextFile).definitions
+        if (definitions.isEmpty()) return // nothing indexed: stay quiet rather than false-warn
+        if (definitions.any { it.type == type && it.name == name }) return
 
         val range = TextRange(1, arg.textLength - 1).takeIf { it.startOffset < it.endOffset } ?: return
         holder.registerProblem(arg, range, QiqBundle.message("inspection.section.undefined", name))

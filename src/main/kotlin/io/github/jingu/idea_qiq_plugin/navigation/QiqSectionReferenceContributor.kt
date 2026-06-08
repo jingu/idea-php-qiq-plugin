@@ -64,12 +64,13 @@ class QiqSectionReference(
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
         val contextFile = contextVirtualFile ?: element.containingFile?.virtualFile ?: return emptyArray()
         val psiManager = com.intellij.psi.PsiManager.getInstance(element.project)
+        val head = if (type == QiqBlockType.BLOCK) "setBlock" else "setSection"
         return QiqSectionIndex.definitionsByName(element.project, contextFile, name, type)
             .mapNotNull { location ->
                 val psiFile = psiManager.findFile(location.file) ?: return@mapNotNull null
                 // A synthetic target whose presentation carries the file path, so
                 // same-named definitions in different templates are distinguishable.
-                val target = QiqSectionTarget(psiFile, location.def.name, location.def.type, location.def.nameRange.startOffset)
+                val target = QiqSectionTarget(psiFile, location.name, head, location.nameRange.startOffset)
                 PsiElementResolveResult(target)
             }
             .toTypedArray()

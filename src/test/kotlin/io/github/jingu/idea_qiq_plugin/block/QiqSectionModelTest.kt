@@ -60,4 +60,34 @@ class QiqSectionModelTest {
         val text = "{{ setSection(\"main\") }}{{ endSection() }}"
         assertEquals("main", QiqSectionModel.definitions(text).single().name)
     }
+
+    @Test
+    fun extractsGetSectionAndGetBlockUsages() {
+        val text = """
+            {{= ${'$'}this->getSection('header') }}
+            {{= getBlock('content') }}
+        """.trimIndent()
+
+        val usages = QiqSectionModel.usages(text)
+        assertEquals(2, usages.size)
+        assertEquals("header", usages[0].name)
+        assertEquals(QiqBlockType.SECTION, usages[0].type)
+        assertEquals("content", usages[1].name)
+        assertEquals(QiqBlockType.BLOCK, usages[1].type)
+    }
+
+    @Test
+    fun usageNameRangePointsAtTheName() {
+        val text = "{{= ${'$'}this->getSection('header') }}"
+        val usage = QiqSectionModel.usages(text).single()
+        assertEquals("header", text.substring(usage.nameRange.startOffset, usage.nameRange.endOffset))
+        assertEquals(text.indexOf("header"), usage.nameRange.startOffset)
+    }
+
+    @Test
+    fun usagesIgnoreDefinitionsAndSimilarNames() {
+        // setSection is a definition, not a usage; hasSection is unrelated.
+        val text = "{{ setSection('a') }}{{ endSection() }}{{ if (${'$'}this->hasSection('a')): }}x{{ endif }}"
+        assertTrue(QiqSectionModel.usages(text).isEmpty())
+    }
 }

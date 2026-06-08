@@ -104,6 +104,12 @@
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqSectionReferenceContributor"/>
 
+        <!-- Reverse navigation: a gutter marker on setSection('x')/setBlock('x')
+             jumps to the getSection/getBlock usages of that name. -->
+        <codeInsight.lineMarkerProvider
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.navigation.QiqSectionLineMarkerProvider"/>
+
         <!-- Warn when setLayout()/render()/extends()/include() reference a
              template that does not exist. Uses the same resolver as Go to
              Declaration, so a path is flagged exactly when Cmd/Ctrl+click would

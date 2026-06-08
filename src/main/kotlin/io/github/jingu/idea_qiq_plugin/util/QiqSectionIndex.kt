@@ -4,32 +4,38 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.PsiModificationTracker
 import io.github.jingu.idea_qiq_plugin.block.QiqBlockType
-import io.github.jingu.idea_qiq_plugin.block.QiqSectionDef
 import io.github.jingu.idea_qiq_plugin.block.QiqSectionModel
 import io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService
 
-/** A section/block definition together with the template file it was found in. */
-data class QiqSectionLocation(val file: VirtualFile, val def: QiqSectionDef)
+/** A section/block name occurrence (definition or usage) and the file it is in. */
+data class QiqSectionLocation(
+    val file: VirtualFile,
+    val name: String,
+    val type: QiqBlockType,
+    val nameRange: TextRange,
+)
 
 /**
- * A template-root-wide index of Qiq section/block name definitions
- * (`setSection`/`setBlock`), backing name completion, Go to Declaration, and the
- * undefined-name inspection for `getSection`/`getBlock`.
+ * A template-root-wide index of Qiq section/block name occurrences — both
+ * definitions (`setSection`/`setBlock`) and usages (`getSection`/`getBlock`) —
+ * backing name completion, Go to Declaration (usage -> definitions), the
+ * undefined-name inspection, and the gutter marker (definition -> usages).
  *
- * Qiq's layout direction is page -> layout: a page `setSection('x')`s content and
- * declares its layout, while the layout `getSection('x')`s it back. The matching
- * definition therefore lives *downstream* of a `getSection` in the layout, not on
- * the file's own `setLayout`/`extends` chain — so resolution is scoped to all
- * templates under the detected roots ([QiqSettingsService.resolveTemplateRoots] /
+ * Qiq's layout direction is page -> layout (a page `setSection`s content and
+ * declares its layout; the layout `getSection`s it back), so a name's definition
+ * and usages live in different files and neither is on the other's own
+ * `setLayout`/`extends` chain. Resolution is therefore scoped to all templates
+ * under the detected roots ([QiqSettingsService.resolveTemplateRoots] /
  * [QiqSettingsService.resolveTemplateBase]) rather than a single chain.
  *
- * The scan is cached per context file and invalidated on any PSI change
+ * Cached per context file, invalidated on any PSI change
  * ([PsiModificationTracker.MODIFICATION_COUNT]); a file-based index is a possible
  * later optimisation (tracked with #23/#32).
  */
@@ -37,9 +43,14 @@ object QiqSectionIndex {
 
     private const val MAX_FILES = 2000
 
-    /** Every section/block definition under the roots discovered for [contextFile]. */
-    fun allDefinitions(project: Project, contextFile: VirtualFile): List<QiqSectionLocation> {
-        val psiFile = PsiManager.getInstance(project).findFile(contextFile) ?: return emptyList()
+    /** Definitions and usages found under the roots discovered for [contextFile]. */
+    data class Index(
+        val definitions: List<QiqSectionLocation>,
+        val usages: List<QiqSectionLocation>,
+    )
+
+    fun index(project: Project, contextFile: VirtualFile): Index {
+        val psiFile = PsiManager.getInstance(project).findFile(contextFile) ?: return EMPTY
         return CachedValuesManager.getCachedValue(psiFile) {
             CachedValueProvider.Result.create(
                 compute(project, contextFile),
@@ -50,44 +61,46 @@ object QiqSectionIndex {
 
     /** The defined names of [type] visible from [contextFile]. */
     fun definedNames(project: Project, contextFile: VirtualFile, type: QiqBlockType): Set<String> =
-        allDefinitions(project, contextFile).asSequence()
-            .filter { it.def.type == type }
-            .map { it.def.name }
+        index(project, contextFile).definitions.asSequence()
+            .filter { it.type == type }
+            .map { it.name }
             .toSet()
 
-    /** Every definition of [name] with the given [type] visible from [contextFile]. */
-    fun definitionsByName(
-        project: Project,
-        contextFile: VirtualFile,
-        name: String,
-        type: QiqBlockType,
-    ): List<QiqSectionLocation> =
-        allDefinitions(project, contextFile).filter { it.def.type == type && it.def.name == name }
+    /** Every definition of [name]/[type] visible from [contextFile]. */
+    fun definitionsByName(project: Project, contextFile: VirtualFile, name: String, type: QiqBlockType): List<QiqSectionLocation> =
+        index(project, contextFile).definitions.filter { it.type == type && it.name == name }
 
-    private fun compute(project: Project, contextFile: VirtualFile): List<QiqSectionLocation> {
-        val settings = QiqSettingsService.getInstance(project) ?: return emptyList()
+    /** Every usage of [name]/[type] visible from [contextFile]. */
+    fun usagesByName(project: Project, contextFile: VirtualFile, name: String, type: QiqBlockType): List<QiqSectionLocation> =
+        index(project, contextFile).usages.filter { it.type == type && it.name == name }
+
+    private val EMPTY = Index(emptyList(), emptyList())
+
+    private fun compute(project: Project, contextFile: VirtualFile): Index {
+        val settings = QiqSettingsService.getInstance(project) ?: return EMPTY
         val exts = QiqTemplateResolver.candidateExtensions(project)
         val roots = LinkedHashSet<VirtualFile>()
         roots.addAll(settings.resolveTemplateRoots(contextFile))
         settings.resolveTemplateBase(contextFile)?.let { roots.add(it) }
-        if (roots.isEmpty()) return emptyList()
+        if (roots.isEmpty()) return EMPTY
 
-        val out = ArrayList<QiqSectionLocation>()
+        val definitions = ArrayList<QiqSectionLocation>()
+        val usages = ArrayList<QiqSectionLocation>()
         val visited = HashSet<String>()
         var budget = MAX_FILES
         for (root in roots) {
-            budget = collect(project, root, exts, visited, out, budget)
+            budget = collect(root, exts, visited, definitions, usages, budget)
             if (budget <= 0) break
         }
-        return out
+        return Index(definitions, usages)
     }
 
     private fun collect(
-        project: Project,
         dir: VirtualFile,
         extensions: List<String>,
         visited: MutableSet<String>,
-        out: MutableList<QiqSectionLocation>,
+        definitions: MutableList<QiqSectionLocation>,
+        usages: MutableList<QiqSectionLocation>,
         budget: Int,
     ): Int {
         var remaining = budget
@@ -95,12 +108,15 @@ object QiqSectionIndex {
             ProgressManager.checkCanceled()
             if (remaining <= 0) return remaining
             if (child.isDirectory) {
-                remaining = collect(project, child, extensions, visited, out, remaining)
+                remaining = collect(child, extensions, visited, definitions, usages, remaining)
             } else if (isTemplateFile(child, extensions) && visited.add(child.path)) {
                 remaining--
                 val text = readText(child) ?: continue
                 for (def in QiqSectionModel.definitions(text)) {
-                    out.add(QiqSectionLocation(child, def))
+                    definitions.add(QiqSectionLocation(child, def.name, def.type, def.nameRange))
+                }
+                for (use in QiqSectionModel.usages(text)) {
+                    usages.add(QiqSectionLocation(child, use.name, use.type, use.nameRange))
                 }
             }
         }

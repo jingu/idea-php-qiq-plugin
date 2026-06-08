@@ -23,6 +23,11 @@ object QiqSectionCall {
         "getblock" to QiqBlockType.BLOCK,
     )
 
+    private val WRITERS = mapOf(
+        "setsection" to QiqBlockType.SECTION,
+        "setblock" to QiqBlockType.BLOCK,
+    )
+
     /**
      * The block type [call] reads (getSection -> SECTION, getBlock -> BLOCK), or
      * null if it is not a reader call. An *instance* call counts only when the
@@ -42,10 +47,29 @@ object QiqSectionCall {
      * else null. Used by the completion and reference contributors, which start
      * from the string literal under the caret.
      */
-    fun readerTypeForArg(literal: StringLiteralExpression): QiqBlockType? {
+    fun readerTypeForArg(literal: StringLiteralExpression): QiqBlockType? =
+        typeForArg(literal, ::readerType)
+
+    /**
+     * The block type if [literal] is the first (name) argument of a *writer* call
+     * (`setSection`/`setBlock`), else null. Used by the line marker that links a
+     * definition to its `getSection`/`getBlock` usages.
+     */
+    fun writerTypeForArg(literal: StringLiteralExpression): QiqBlockType? =
+        typeForArg(literal) { call ->
+            val name = call.name?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() } ?: return@typeForArg null
+            val type = WRITERS[name] ?: return@typeForArg null
+            val receiver = (call as? MethodReference)?.classReference
+            if (receiver is Variable && receiver.name != "this") null else type
+        }
+
+    private inline fun typeForArg(
+        literal: StringLiteralExpression,
+        type: (FunctionReference) -> QiqBlockType?,
+    ): QiqBlockType? {
         val parameterList = literal.parent as? ParameterList ?: return null
         val call = parameterList.parent as? FunctionReference ?: return null
         if (parameterList.parameters.firstOrNull() !== literal) return null
-        return readerType(call)
+        return type(call)
     }
 }
