@@ -12,6 +12,7 @@ import com.jetbrains.php.lang.psi.elements.Variable
 import com.jetbrains.php.lang.psi.visitors.PhpElementVisitor
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
 import io.github.jingu.idea_qiq_plugin.ui.QiqBundle
+import io.github.jingu.idea_qiq_plugin.util.QiqTemplateResolver
 import io.github.jingu.idea_qiq_plugin.util.QiqUtil
 
 /**
@@ -50,9 +51,9 @@ class QiqTemplatePathInspection : LocalInspectionTool() {
 
         val arg = call.parameterList?.parameters?.firstOrNull() as? StringLiteralExpression ?: return
         val path = arg.contents
-        // Skip blanks and anything dynamic (interpolation / unusual spacing) we
-        // cannot resolve statically.
-        if (path.isBlank() || path.contains(' ') || path.contains('$')) return
+        // Skip anything dynamic (interpolation / any whitespace) we cannot
+        // resolve statically; share the same static-path gate as the resolver.
+        if (QiqTemplateResolver.normalizePath(path) == null) return
 
         val contextFile = InjectedLanguageManager.getInstance(call.project).getTopLevelFile(call)?.virtualFile
             ?: call.containingFile?.virtualFile
