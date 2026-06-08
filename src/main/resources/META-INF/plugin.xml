@@ -226,7 +226,7 @@
   </li>
   <li><b>Structure view (outline)</b>
     <ul>
-      <li>The Structure tool window (Cmd/Ctrl+F12) shows <code>setSection</code>/<code>setBlock</code> by name, nested control blocks (<code>if</code>/<code>foreach</code>/<code>for</code>), and top-level <code>setLayout()</code>/<code>extends()</code> directives. Clicking a node navigates to the directive.</li>
+      <li>The Structure tool window (Alt+7 / Cmd+7) shows <code>setSection</code>/<code>setBlock</code> by name, nested control blocks (<code>if</code>/<code>foreach</code>/<code>for</code>), and top-level <code>setLayout()</code>/<code>extends()</code> directives. Clicking a node navigates to the directive.</li>
     </ul>
   </li>
   <li><b>Inspection: unclosed / mismatched block directives</b>

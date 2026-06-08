@@ -18,7 +18,7 @@ Qiq Templates Support is an IntelliJ-based plugin that brings syntax highlightin
 - **Template path completion & validation**: the path argument of `setLayout()`, `render()`, `extends()`, and `include()` completes from the discovered template roots — both relative paths and Qiq root-absolute paths (`/layout/base`, leading `/` optional), matched as substrings. A path that resolves to no template is flagged with a warning.
 - **Code folding** for Qiq block directives (`{{ if (...): }}`…`{{ endif }}`, `foreach`, `for`, `setSection`, `setBlock`) — only the body folds, so the opener and closer stay visible.
 - **Block matching & pair highlighting**: Qiq delimiters (`{{`, `{{=`, `{{h`, etc.) pair with their closing `}}` without matching braces from injected PHP or HTML, and the caret on a block opener/closer highlights its partner directive — nested same-keyword blocks resolve correctly.
-- **Structure view**: the Structure tool window (Cmd/Ctrl+F12) outlines sections/blocks by name, nested control blocks, and top-level `setLayout()`/`extends()` directives, with click-to-navigate.
+- **Structure view**: the Structure tool window (Alt+7 / Cmd+7) outlines sections/blocks by name, nested control blocks, and top-level `setLayout()`/`extends()` directives, with click-to-navigate.
 - **Block directive inspection**: warns on an unclosed opener, a closer with no opener, and a closer that doesn't match the nearest open block (`{{ foreach }}`…`{{ endif }}`).
 - **Enter/typing handlers** that auto-complete Qiq block closers and keep indentation consistent.
 - **Template discovery**: resolves relative paths by walking up from the current file, project roots, and PHP server document roots.
