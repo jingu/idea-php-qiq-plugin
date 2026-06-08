@@ -6,7 +6,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementResolveResult
-import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiPolyVariantReferenceBase
 import com.intellij.psi.PsiReference
 import com.intellij.psi.PsiReferenceContributor
@@ -64,11 +63,13 @@ class QiqSectionReference(
 
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
         val contextFile = contextVirtualFile ?: element.containingFile?.virtualFile ?: return emptyArray()
-        val psiManager = PsiManager.getInstance(element.project)
+        val psiManager = com.intellij.psi.PsiManager.getInstance(element.project)
         return QiqSectionIndex.definitionsByName(element.project, contextFile, name, type)
             .mapNotNull { location ->
                 val psiFile = psiManager.findFile(location.file) ?: return@mapNotNull null
-                val target = psiFile.findElementAt(location.def.nameRange.startOffset) ?: psiFile
+                // A synthetic target whose presentation carries the file path, so
+                // same-named definitions in different templates are distinguishable.
+                val target = QiqSectionTarget(psiFile, location.def.name, location.def.type, location.def.nameRange.startOffset)
                 PsiElementResolveResult(target)
             }
             .toTypedArray()
