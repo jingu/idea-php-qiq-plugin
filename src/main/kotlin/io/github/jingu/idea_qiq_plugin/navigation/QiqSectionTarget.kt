@@ -13,7 +13,10 @@ import javax.swing.Icon
  *
  * A synthetic element (the occurrence lives in injected PHP text, not a stable
  * PSI symbol) whose [getPresentation] renders the directive plus `path:line`, so
- * the popup distinguishes same-named occurrences in different templates.
+ * the popup distinguishes same-named occurrences in different templates. The
+ * `path:line` is folded into the presentable text rather than the location
+ * string, because the declaration chooser wraps the location in parentheses;
+ * folding it in keeps the chooser entries free of `(...)`.
  * Navigation falls back to [getContainingFile] + [getTextOffset] via
  * [FakePsiElement]/PsiElementBase. [getIcon] is fixed to null so the chooser does
  * not briefly flash the file-type icon before settling.
@@ -36,9 +39,16 @@ class QiqSectionTarget(
     override fun getIcon(open: Boolean): Icon? = null
 
     override fun getPresentation(): ItemPresentation = object : ItemPresentation {
-        override fun getPresentableText(): String = "$head('$sectionName')"
+        override fun getPresentableText(): String = "$head('$sectionName')  $pathAndLine"
 
-        override fun getLocationString(): String? {
+        override fun getLocationString(): String? = null
+
+        override fun getIcon(unused: Boolean): Icon? = null
+    }
+
+    /** Project-relative `path:line` (or the file name as a fallback). */
+    private val pathAndLine: String
+        get() {
             val virtualFile = file.virtualFile ?: return file.name
             val base = file.project.basePath
             val path = if (base != null && virtualFile.path.startsWith(base)) {
@@ -49,7 +59,4 @@ class QiqSectionTarget(
             val line = file.viewProvider.document?.getLineNumber(nameOffset)?.plus(1)
             return if (line != null) "$path:$line" else path
         }
-
-        override fun getIcon(unused: Boolean): Icon? = null
-    }
 }
