@@ -97,7 +97,7 @@ class QiqTemplateResolverTest {
         assertNull(QiqTemplateResolver.normalizePath(""))
         assertNull(QiqTemplateResolver.normalizePath("   "))
         assertNull(QiqTemplateResolver.normalizePath("/"))
-        assertNull(QiqTemplateResolver.normalizePath("layout $name"))
+        assertNull(QiqTemplateResolver.normalizePath("layout \$name"))
     }
 
     // --- normalizeExtensions -------------------------------------------------
