@@ -98,17 +98,15 @@
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
 
-        <!-- Go to Declaration from a `getSection('x')` / `getBlock('x')` name to
-             the matching `setSection`/`setBlock` definitions under the detected
-             template roots (poly-variant; a name may be set by several pages). -->
-        <psi.referenceContributor
-                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqSectionReferenceContributor"/>
-
-        <!-- Reverse navigation: a gutter marker on setSection('x')/setBlock('x')
-             jumps to the getSection/getBlock usages of that name. -->
-        <codeInsight.lineMarkerProvider
-                language="PHP"
-                implementationClass="io.github.jingu.idea_qiq_plugin.navigation.QiqSectionLineMarkerProvider"/>
+        <!-- Cmd/Ctrl+click navigation on section/block names, both directions:
+             getSection('x') -> setSection definitions, setSection('x') ->
+             getSection usages, across the detected template roots. A
+             GotoDeclarationHandler (not a referenceContributor) so a name that
+             collides with a PHP function (e.g. 'header') is not suppressed by
+             PsiMultiReference preferring the hard PHP function reference. -->
+        <gotoDeclarationHandler
+                order="first"
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqSectionGotoDeclarationHandler"/>
 
         <!-- Warn when setLayout()/render()/extends()/include() reference a
              template that does not exist. Uses the same resolver as Go to
