@@ -49,10 +49,11 @@ class QiqSectionModelTest {
     }
 
     @Test
-    fun definedNamesFiltersByType() {
+    fun definitionsCarryTheirBlockType() {
         val text = "{{ setSection('a') }}{{ endSection() }}{{ setBlock('b') }}{{ endBlock() }}"
-        assertEquals(setOf("a"), QiqSectionModel.definedNames(text, QiqBlockType.SECTION))
-        assertEquals(setOf("b"), QiqSectionModel.definedNames(text, QiqBlockType.BLOCK))
+        val byType = QiqSectionModel.definitions(text).associate { it.name to it.type }
+        assertEquals(QiqBlockType.SECTION, byType["a"])
+        assertEquals(QiqBlockType.BLOCK, byType["b"])
     }
 
     @Test

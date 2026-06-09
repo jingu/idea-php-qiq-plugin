@@ -52,10 +52,6 @@ object QiqSectionModel {
         return result
     }
 
-    /** The defined names of [type] in [text]. */
-    fun definedNames(text: CharSequence, type: QiqBlockType): Set<String> =
-        definitions(text).asSequence().filter { it.type == type }.map { it.name }.toSet()
-
     private val READER = Regex("(?i)\\b(getSection|getBlock)\\s*\\(\\s*(['\"])(.*?)\\2")
 
     /**

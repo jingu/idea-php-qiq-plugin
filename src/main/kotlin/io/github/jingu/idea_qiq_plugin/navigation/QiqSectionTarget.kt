@@ -12,14 +12,13 @@ import javax.swing.Icon
  * label).
  *
  * A synthetic element (the occurrence lives in injected PHP text, not a stable
- * PSI symbol) whose [getPresentation] renders the directive plus `path:line`, so
- * the popup distinguishes same-named occurrences in different templates. The
- * `path:line` is folded into the presentable text rather than the location
- * string, because the declaration chooser wraps the location in parentheses;
- * folding it in keeps the chooser entries free of `(...)`.
- * Navigation falls back to [getContainingFile] + [getTextOffset] via
- * [FakePsiElement]/PsiElementBase. [getIcon] is fixed to null so the chooser does
- * not briefly flash the file-type icon before settling.
+ * PSI symbol) whose [getPresentation] renders the directive as the main text and
+ * the `path:line` as the (grey, parenthesised) location string, so the chooser
+ * distinguishes same-named occurrences in different templates. Navigation falls
+ * back to [getContainingFile] + [getTextOffset] via [FakePsiElement]/
+ * PsiElementBase. The icon is the containing template file's icon, returned
+ * consistently from both [getIcon] and the presentation so the chooser shows it
+ * steadily rather than flashing it on and then clearing it.
  */
 class QiqSectionTarget(
     private val file: PsiFile,
@@ -36,15 +35,21 @@ class QiqSectionTarget(
 
     override fun getName(): String = sectionName
 
-    override fun getIcon(open: Boolean): Icon? = null
+    override fun getIcon(open: Boolean): Icon? = fileIcon
 
+    // FakePsiElement.getIcon(int) is final and delegates to this presentation's
+    // getIcon, so returning the file icon here is what the chooser shows.
     override fun getPresentation(): ItemPresentation = object : ItemPresentation {
-        override fun getPresentableText(): String = "$head('$sectionName')  $pathAndLine"
+        override fun getPresentableText(): String = "$head('$sectionName')"
 
-        override fun getLocationString(): String? = null
+        override fun getLocationString(): String = pathAndLine
 
-        override fun getIcon(unused: Boolean): Icon? = null
+        override fun getIcon(unused: Boolean): Icon? = fileIcon
     }
+
+    /** The containing template file's icon, shown consistently to avoid a flash. */
+    private val fileIcon: Icon?
+        get() = file.getIcon(0)
 
     /** Project-relative `path:line` (or the file name as a fallback). */
     private val pathAndLine: String
