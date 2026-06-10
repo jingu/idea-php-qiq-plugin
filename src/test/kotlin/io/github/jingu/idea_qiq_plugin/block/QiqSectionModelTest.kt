@@ -91,4 +91,15 @@ class QiqSectionModelTest {
         val text = "{{ setSection('a') }}{{ endSection() }}{{= getBlock() }}"
         assertTrue(QiqSectionModel.usages(text).isEmpty())
     }
+
+    @Test
+    fun usagesAcceptOnlyBareOrThisReceivers() {
+        // $obj->getSection(...) is some other object's method, not a Qiq section
+        // read, matching the PSI gate in QiqSectionCall.
+        assertTrue(QiqSectionModel.usages("{{= ${'$'}obj->getSection('x') }}").isEmpty())
+        assertTrue(QiqSectionModel.usages("{{= ${'$'}page->view->getSection('x') }}").isEmpty())
+        // Bare and $this-> reads are indexed.
+        assertEquals("a", QiqSectionModel.usages("{{= getSection('a') }}").single().name)
+        assertEquals("b", QiqSectionModel.usages("{{= ${'$'}this->getSection('b') }}").single().name)
+    }
 }

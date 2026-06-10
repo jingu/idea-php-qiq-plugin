@@ -37,7 +37,12 @@ data class QiqSectionUsage(
  */
 object QiqSectionModel {
 
-    private val READER = Regex("(?i)\\b(getSection|hasSection)\\s*\\(\\s*(['\"])(.*?)\\2")
+    // A reader is a bare call or a `$this->` call only — never a call on another
+    // receiver (`$obj->getSection(...)`), matching the PSI gate in QiqSectionCall.
+    // The leading non-capturing group consumes an optional `$this->`; its bare
+    // alternative is a zero-width lookbehind rejecting a preceding member-access
+    // (`->`/`::`) or identifier char. Groups stay 1=head, 2=quote, 3=name.
+    private val READER = Regex("(?i)(?:\\\$this\\s*->\\s*|(?<![-:>\\w\$]))(getSection|hasSection)\\s*\\(\\s*(['\"])(.*?)\\2")
 
     /**
      * Every `setSection` name definition in [text], in document order. Directives
@@ -57,7 +62,8 @@ object QiqSectionModel {
     /**
      * Every `getSection`/`hasSection` name usage in [text], in document order.
      * Matched within each `{{ ... }}` directive so plain text is not scanned.
-     * Usages with an empty name are skipped.
+     * Only bare or `$this->` reads count (not `$obj->getSection(...)`); usages with
+     * an empty name are skipped.
      */
     fun usages(text: CharSequence): List<QiqSectionUsage> {
         val result = ArrayList<QiqSectionUsage>()

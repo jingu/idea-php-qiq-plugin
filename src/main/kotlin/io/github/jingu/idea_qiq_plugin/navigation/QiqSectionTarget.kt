@@ -7,9 +7,10 @@ import com.intellij.psi.impl.FakePsiElement
 import javax.swing.Icon
 
 /**
- * A navigation target for a section/block name occurrence (a `setSection` /
- * `setBlock` definition, or a `getSection` / `getBlock` usage — [head] picks the
- * label).
+ * A navigation target for a Qiq section name occurrence (a `setSection`
+ * definition, or a `getSection` / `hasSection` usage — [head] is the directive
+ * name used as the label). Blocks are out of the name workflow (`getBlock()` is
+ * argument-less), so there are no block targets.
  *
  * A synthetic element (the occurrence lives in injected PHP text, not a stable
  * PSI symbol) whose [getPresentation] renders the directive as the main text and
