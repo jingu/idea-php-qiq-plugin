@@ -1,5 +1,6 @@
 package io.github.jingu.idea_qiq_plugin.util
 
+import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.FunctionReference
 import com.jetbrains.php.lang.psi.elements.MethodReference
 import com.jetbrains.php.lang.psi.elements.ParameterList
@@ -46,11 +47,23 @@ object QiqSectionCall {
         return headOfCall(call)
     }
 
-    /** The lowercased call name, or null when the receiver is an object other than `$this`. */
+    /**
+     * The lowercased call name, or null when it is not a Qiq-style call. A bare
+     * function call (`getSection(...)`) and a static call
+     * (`\QiqRuntimeFunctions::getSection(...)`) qualify; an instance call only
+     * when the receiver is exactly `$this`. Other receivers — another variable, a
+     * method chain (`$a->b()->getSection(...)`), a field (`$a->b->getSection(...)`)
+     * — are rejected so they do not produce false completion/navigation results.
+     */
     private fun headOfCall(call: FunctionReference): String? {
         val name = call.name?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() } ?: return null
-        val receiver = (call as? MethodReference)?.classReference
-        if (receiver is Variable && receiver.name != "this") return null
+        if (call is MethodReference) {
+            when (val receiver = call.classReference) {
+                is Variable -> if (receiver.name != "this") return null
+                is ClassReference -> {} // static call
+                else -> return null
+            }
+        }
         return name
     }
 }

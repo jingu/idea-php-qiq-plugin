@@ -52,6 +52,17 @@ class QiqSectionModelTest {
     }
 
     @Test
+    fun definitionRequiresAPlainStringFirstArgument() {
+        // A non-literal or non-first-argument quoted string must not be indexed as
+        // a section name (only the first argument, when a plain string, counts).
+        assertTrue(QiqSectionModel.definitions("{{ setSection(${'$'}name) }}x{{ endSection() }}").isEmpty())
+        assertTrue(QiqSectionModel.definitions("{{ setSection(${'$'}name, 'fallback') }}x{{ endSection() }}").isEmpty())
+        assertTrue(QiqSectionModel.definitions("{{ setSection(${'$'}c ? 'a' : 'b') }}x{{ endSection() }}").isEmpty())
+        // The plain-string first argument is still indexed.
+        assertEquals("ok", QiqSectionModel.definitions("{{ setSection('ok') }}x{{ endSection() }}").single().name)
+    }
+
+    @Test
     fun extractsGetSectionAndHasSectionUsagesWithHead() {
         val text = """
             {{= ${'$'}this->getSection('header') }}

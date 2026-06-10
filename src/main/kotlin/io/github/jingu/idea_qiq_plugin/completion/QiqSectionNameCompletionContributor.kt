@@ -58,11 +58,22 @@ class QiqSectionNameCompletionContributor : CompletionContributor() {
             }
         }
 
-        /** The in-quote text before the caret, excluding the surrounding quote. */
+        /**
+         * The in-quote text before the caret, excluding the surrounding quotes.
+         * Returns null when the caret is at or past the closing quote, so the
+         * closing quote never leaks into the prefix; an unterminated literal
+         * (still being typed) has no closing quote, so its whole tail is included.
+         */
         private fun inQuotePrefix(literal: StringLiteralExpression, caretOffset: Int): String? {
-            val caretInLiteral = caretOffset - literal.textRange.startOffset
             val text = literal.text
-            if (caretInLiteral < 1 || caretInLiteral > text.length) return null
+            if (text.isEmpty()) return null
+            val quote = text[0]
+            if (quote != '\'' && quote != '"') return null
+            val caretInLiteral = caretOffset - literal.textRange.startOffset
+            if (caretInLiteral < 1) return null
+            // Exclude a closing quote when the literal is terminated.
+            val contentEnd = if (text.length >= 2 && text.last() == quote) text.length - 1 else text.length
+            if (caretInLiteral > contentEnd) return null
             return text.substring(1, caretInLiteral)
         }
     }

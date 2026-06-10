@@ -47,7 +47,7 @@ object QiqSectionModel {
         val result = ArrayList<QiqSectionDef>()
         for (directive in QiqBlockModel.scanDirectives(text)) {
             if (QiqBlockModel.openerTypeOf(directive.inner) != QiqBlockType.SECTION) continue
-            val nameRange = firstQuotedRange(text, directive.range) ?: continue
+            val nameRange = firstArgQuotedRange(text, directive.range) ?: continue
             if (nameRange.isEmpty) continue
             result.add(QiqSectionDef(text.substring(nameRange.startOffset, nameRange.endOffset), nameRange))
         }
@@ -76,24 +76,26 @@ object QiqSectionModel {
     }
 
     /**
-     * The content span (excluding quotes) of the first single- or double-quoted
-     * string inside the directive [range] of [text], or null if there is none or
-     * the quote is unterminated.
+     * The content span (excluding quotes) of the call's *first argument* in the
+     * directive [range] of [text], when that argument is a plain quoted string —
+     * else null. Requiring the first non-whitespace token after `(` to be a quote
+     * keeps a non-literal or non-first argument (`setSection($name, 'x')`,
+     * `setSection($c ? 'a' : 'b')`) from being mistaken for a section name.
      */
-    private fun firstQuotedRange(text: CharSequence, range: TextRange): TextRange? {
-        var i = range.startOffset
+    private fun firstArgQuotedRange(text: CharSequence, range: TextRange): TextRange? {
         val end = minOf(range.endOffset, text.length)
-        while (i < end) {
-            val c = text[i]
-            if (c == '\'' || c == '"') {
-                val contentStart = i + 1
-                var j = contentStart
-                while (j < end && text[j] != c) j++
-                if (j >= end) return null // unterminated quote
-                return TextRange(contentStart, j)
-            }
-            i++
-        }
-        return null
+        var i = range.startOffset
+        while (i < end && text[i] != '(') i++
+        if (i >= end) return null
+        i++ // past '('
+        while (i < end && text[i].isWhitespace()) i++
+        if (i >= end) return null
+        val quote = text[i]
+        if (quote != '\'' && quote != '"') return null // first argument is not a plain string literal
+        val contentStart = i + 1
+        var j = contentStart
+        while (j < end && text[j] != quote) j++
+        if (j >= end) return null // unterminated quote
+        return TextRange(contentStart, j)
     }
 }
