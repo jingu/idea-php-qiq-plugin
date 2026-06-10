@@ -128,7 +128,9 @@ object QiqBlockModel {
                 }
                 val openEnd = closeStart + 2
                 val inner = text.subSequence(i + 2, closeStart).toString().trim()
-                directives.add(Directive(TextRange(i, openEnd), headOf(inner), inner))
+                // The head is taken past any `$this->` so `{{ $this->endSection() }}`
+                // yields the same head as the bare `{{ endSection() }}`.
+                directives.add(Directive(TextRange(i, openEnd), headOf(stripThisReceiver(inner)), inner))
                 i = openEnd
             } else {
                 i++
@@ -240,10 +242,11 @@ object QiqBlockModel {
      * pairing here and [io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler].
      */
     fun openerTypeOf(inner: String): QiqBlockType? {
-        val head = headOf(inner)
+        val normalized = stripThisReceiver(inner)
+        val head = headOf(normalized)
         return QiqBlockType.forOpenHead(head)?.takeIf {
-            inner.substring(head.length).trimStart().startsWith("(") &&
-                (!it.requiresColon || inner.trimEnd().endsWith(':'))
+            normalized.substring(head.length).trimStart().startsWith("(") &&
+                (!it.requiresColon || normalized.trimEnd().endsWith(':'))
         }
     }
 
@@ -254,7 +257,9 @@ object QiqBlockModel {
      */
     private fun closeTypeOf(directive: Directive): QiqBlockType? {
         val type = QiqBlockType.forCloseHead(directive.head) ?: return null
-        if ((type == QiqBlockType.SECTION || type == QiqBlockType.BLOCK) && !isEmptyArgClose(directive.inner, type)) {
+        if ((type == QiqBlockType.SECTION || type == QiqBlockType.BLOCK) &&
+            !isEmptyArgClose(stripThisReceiver(directive.inner), type)
+        ) {
             return null
         }
         return type
@@ -271,6 +276,16 @@ object QiqBlockModel {
      */
     private fun headOf(inner: String): String =
         inner.takeWhile { !it.isWhitespace() && it != '(' && it != ':' && it != ';' }
+
+    private val THIS_RECEIVER = Regex("^\\\$this\\s*->\\s*")
+
+    /**
+     * Drops a leading `$this->` so the explicit method form is recognised the same
+     * as the bare one: Qiq compiles `{{ setSection('x') }}` to `$this->setSection('x')`,
+     * and authors may write either, so `{{ $this->setSection('x') }}` … `{{ $this->endSection() }}`
+     * must pair just like the bare form.
+     */
+    private fun stripThisReceiver(inner: String): String = inner.replaceFirst(THIS_RECEIVER, "")
 
     private fun indexOfDoubleBrace(text: CharSequence, from: Int): Int? {
         var j = from
