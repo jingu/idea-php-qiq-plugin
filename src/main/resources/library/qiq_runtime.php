@@ -178,9 +178,11 @@ if (!class_exists('QiqTemplate')) {
         /* Magic methods (match Qiq\TemplateCore): data access via $this->var and
          * helper dispatch via $this->helper(...), so a typed $this does not flag
          * dynamic property/helper access as undefined. */
-        public function __get(string $name): mixed { return null; }
+        /** @return mixed */
+        public function __get(string $name) { return null; }
         public function __isset(string $name): bool { return false; }
-        public function __call(string $name, array $arguments): mixed { return null; }
+        /** @return mixed */
+        public function __call(string $name, array $arguments) { return null; }
 
         /* Template control */
         public function render(string $path, ...$args): void {}

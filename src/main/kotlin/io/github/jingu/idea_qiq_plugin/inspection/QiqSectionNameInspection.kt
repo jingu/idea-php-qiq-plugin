@@ -45,9 +45,12 @@ class QiqSectionNameInspection : LocalInspectionTool() {
             ?: call.containingFile?.virtualFile
             ?: return
 
-        val definitions = QiqSectionIndex.index(call.project, contextFile).definitions
-        if (definitions.isEmpty()) return // nothing indexed: stay quiet rather than false-warn
-        if (definitions.any { it.name == name }) return
+        val index = QiqSectionIndex.index(call.project, contextFile)
+        // Skip only when nothing was scanned at all (roots unresolved); a project
+        // that has getSection usages but no definitions is exactly what we want to
+        // flag, so an empty *definitions* list alone must not silence the warning.
+        if (index.definitions.isEmpty() && index.usages.isEmpty()) return
+        if (index.definitions.any { it.name == name }) return
 
         val range = TextRange(1, arg.textLength - 1).takeIf { it.startOffset < it.endOffset } ?: return
         holder.registerProblem(arg, range, QiqBundle.message("inspection.section.undefined", name))
