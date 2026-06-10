@@ -30,13 +30,16 @@ class QiqPhpInjectorTest {
         @JvmField
         @RegisterExtension
         val projectExtension = ProjectExtension()
+
+        /** Always prepended to the first fragment so `$this->...()` resolves to the stub. */
+        private const val THIS_PRELUDE = "<?php /** @var \\QiqTemplate \$this */ ?>"
     }
 
     private val injector = QiqPhpInjector()
 
     @Test
     fun aggregatesAllFragmentsIntoSinglePhpStream(project: Project) {
-        val expected = """
+        val expected = THIS_PRELUDE + """
             <?php foreach (${ '$'}items as ${ '$'}item): ?><?= \QiqRuntimeFunctions::h(${ '$'}item->name) ?><?php endforeach; ?>
             """.trimIndent()
 
@@ -94,7 +97,7 @@ class QiqPhpInjectorTest {
                 injector.getLanguagesToInject(registrar, host)
 
                 val call = registrar.calls.single { it.language == PhpLanguage.INSTANCE }
-                assertEquals(expectedPrefix, call.prefix, "Wrong prefix for {{$modifier ... }}")
+                assertEquals(THIS_PRELUDE + expectedPrefix, call.prefix, "Wrong prefix for {{$modifier ... }}")
                 assertEquals(") ?>", call.suffix, "Wrong suffix for {{$modifier ... }}")
             }
         }
@@ -225,7 +228,7 @@ class QiqPhpInjectorTest {
             injector.getLanguagesToInject(registrar, host)
 
             val call = registrar.calls.single { it.language == PhpLanguage.INSTANCE }
-            assertEquals("<?= ", call.prefix, "{{= ... }} should keep the plain echo tag")
+            assertEquals(THIS_PRELUDE + "<?= ", call.prefix, "{{= ... }} should keep the plain echo tag")
             assertEquals(" ?>", call.suffix)
         }
     }
@@ -252,7 +255,7 @@ class QiqPhpInjectorTest {
                 injector.getLanguagesToInject(registrar, host)
 
                 val call = registrar.calls.single { it.language == PhpLanguage.INSTANCE }
-                assertEquals("<?= ", call.prefix, "Raw echo must use a plain echo tag for $template")
+                assertEquals(THIS_PRELUDE + "<?= ", call.prefix, "Raw echo must use a plain echo tag for $template")
                 assertEquals(" ?>", call.suffix, "Wrong suffix for $template")
 
                 val injectedExpr = call.host.text.substring(call.range.startOffset, call.range.endOffset)

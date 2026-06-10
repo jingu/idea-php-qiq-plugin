@@ -164,6 +164,13 @@
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqHelperInspectionSuppressor"/>
 
+        <!-- Suppress "Property accessed via magic method" for `$this->data` in
+             templates: Qiq reads template data through Qiq\TemplateCore::__get, so
+             with $this typed as the stub every data access would otherwise warn. -->
+        <lang.inspectionSuppressor
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqTemplateFieldInspectionSuppressor"/>
+
         <!-- Argument check for helper calls. PhpStorm cannot check the
              arguments of an unresolved `helper(...)` call, so this compares the
              call against the resolved helper target's signature (1.x `__invoke`
