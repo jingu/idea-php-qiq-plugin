@@ -12,19 +12,16 @@ import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.ProcessingContext
 import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
-import io.github.jingu.idea_qiq_plugin.block.QiqBlockType
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
 import io.github.jingu.idea_qiq_plugin.util.QiqSectionCall
 import io.github.jingu.idea_qiq_plugin.util.QiqSectionIndex
 
 /**
- * Completes section/block names in the first argument of `getSection('...')` /
- * `getBlock('...')` (bare or `$this->`) inside Qiq templates.
+ * Completes section names in the first argument of `getSection('...')` /
+ * `hasSection('...')` (bare or `$this->`) inside Qiq templates.
  *
- * Candidates are the matching `setSection`/`setBlock` names from
- * [QiqSectionIndex] (template-root-wide), filtered by kind so `getSection`
- * offers only section names and `getBlock` only block names. Pairs with the
- * Go to Declaration on the same argument.
+ * Candidates are the `setSection` names from [QiqSectionIndex] (template-root-
+ * wide). Pairs with the Go to Declaration on the same argument.
  */
 class QiqSectionNameCompletionContributor : CompletionContributor() {
 
@@ -46,7 +43,7 @@ class QiqSectionNameCompletionContributor : CompletionContributor() {
             if (!QiqInjectionSupport.isInQiqFile(position)) return
 
             val literal = PsiTreeUtil.getParentOfType(position, StringLiteralExpression::class.java) ?: return
-            val type = QiqSectionCall.readerTypeForArg(literal) ?: return
+            if (!QiqSectionCall.isReaderArg(literal)) return
 
             val project = position.project
             val ilm = InjectedLanguageManager.getInstance(project)
@@ -56,9 +53,8 @@ class QiqSectionNameCompletionContributor : CompletionContributor() {
             val typedPrefix = inQuotePrefix(literal, parameters.offset) ?: return
             val sink = result.withPrefixMatcher(PlainPrefixMatcher(typedPrefix, false))
 
-            val typeText = typeText(type)
-            for (name in QiqSectionIndex.definedNames(project, contextFile, type)) {
-                sink.addElement(LookupElementBuilder.create(name).withTypeText(typeText, true))
+            for (name in QiqSectionIndex.definedNames(project, contextFile)) {
+                sink.addElement(LookupElementBuilder.create(name).withTypeText("Qiq section", true))
             }
         }
 
@@ -69,8 +65,5 @@ class QiqSectionNameCompletionContributor : CompletionContributor() {
             if (caretInLiteral < 1 || caretInLiteral > text.length) return null
             return text.substring(1, caretInLiteral)
         }
-
-        private fun typeText(type: QiqBlockType): String =
-            if (type == QiqBlockType.BLOCK) "Qiq block" else "Qiq section"
     }
 }

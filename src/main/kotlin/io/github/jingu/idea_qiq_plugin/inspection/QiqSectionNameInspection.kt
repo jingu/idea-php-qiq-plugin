@@ -15,14 +15,14 @@ import io.github.jingu.idea_qiq_plugin.util.QiqSectionCall
 import io.github.jingu.idea_qiq_plugin.util.QiqSectionIndex
 
 /**
- * Warns when `getSection('x')` / `getBlock('x')` reads a name that no
- * `setSection`/`setBlock` defines anywhere under the detected template roots.
+ * Warns when `getSection('x')` reads a name that no `setSection` defines anywhere
+ * under the detected template roots.
  *
- * Deliberately conservative: only a plain string-literal name is checked, and the
- * warning is suppressed when the section index is empty (no templates scanned /
- * roots unresolved), since we then cannot be sure the name is truly undefined.
- * Section and block names are separate namespaces — a `getSection` is not
- * satisfied by a `setBlock` of the same name.
+ * Deliberately conservative: only `getSection` is flagged — `hasSection('x')`
+ * legitimately tests a possibly-absent name, so a missing one is not a bug — only
+ * a plain string-literal name is checked, and the warning is suppressed when the
+ * section index is empty (no templates scanned / roots unresolved), since we then
+ * cannot be sure the name is truly undefined.
  */
 class QiqSectionNameInspection : LocalInspectionTool() {
 
@@ -36,7 +36,7 @@ class QiqSectionNameInspection : LocalInspectionTool() {
     private fun inspectCall(call: FunctionReference, holder: ProblemsHolder) {
         if (!QiqInjectionSupport.isInQiqFile(call)) return
 
-        val type = QiqSectionCall.readerType(call) ?: return
+        if (!QiqSectionCall.isInspectableReader(call)) return
         val arg = call.parameterList?.parameters?.firstOrNull() as? StringLiteralExpression ?: return
         val name = arg.contents
         if (name.isEmpty()) return
@@ -47,7 +47,7 @@ class QiqSectionNameInspection : LocalInspectionTool() {
 
         val definitions = QiqSectionIndex.index(call.project, contextFile).definitions
         if (definitions.isEmpty()) return // nothing indexed: stay quiet rather than false-warn
-        if (definitions.any { it.type == type && it.name == name }) return
+        if (definitions.any { it.name == name }) return
 
         val range = TextRange(1, arg.textLength - 1).takeIf { it.startOffset < it.endOffset } ?: return
         holder.registerProblem(arg, range, QiqBundle.message("inspection.section.undefined", name))

@@ -10,23 +10,26 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.PsiModificationTracker
-import io.github.jingu.idea_qiq_plugin.block.QiqBlockType
 import io.github.jingu.idea_qiq_plugin.block.QiqSectionModel
 import io.github.jingu.idea_qiq_plugin.settings.QiqSettingsService
 
-/** A section/block name occurrence (definition or usage) and the file it is in. */
+/**
+ * A section name occurrence (a `setSection` definition or a `getSection`/
+ * `hasSection` usage) and the file it is in. [head] is the directive name
+ * (`setSection` / `getSection` / `hasSection`) used to label a navigation target.
+ */
 data class QiqSectionLocation(
     val file: VirtualFile,
     val name: String,
-    val type: QiqBlockType,
+    val head: String,
     val nameRange: TextRange,
 )
 
 /**
- * A template-root-wide index of Qiq section/block name occurrences — both
- * definitions (`setSection`/`setBlock`) and usages (`getSection`/`getBlock`) —
- * backing name completion, Go to Declaration (usage -> definitions), the
- * undefined-name inspection, and the gutter marker (definition -> usages).
+ * A template-root-wide index of Qiq section name occurrences — both definitions
+ * (`setSection`) and usages (`getSection` / `hasSection`) — backing name
+ * completion, Go to Declaration (both directions), and the undefined-name
+ * inspection.
  *
  * Qiq's layout direction is page -> layout (a page `setSection`s content and
  * declares its layout; the layout `getSection`s it back), so a name's definition
@@ -59,20 +62,17 @@ object QiqSectionIndex {
         }
     }
 
-    /** The defined names of [type] visible from [contextFile]. */
-    fun definedNames(project: Project, contextFile: VirtualFile, type: QiqBlockType): Set<String> =
-        index(project, contextFile).definitions.asSequence()
-            .filter { it.type == type }
-            .map { it.name }
-            .toSet()
+    /** The defined section names visible from [contextFile]. */
+    fun definedNames(project: Project, contextFile: VirtualFile): Set<String> =
+        index(project, contextFile).definitions.asSequence().map { it.name }.toSet()
 
-    /** Every definition of [name]/[type] visible from [contextFile]. */
-    fun definitionsByName(project: Project, contextFile: VirtualFile, name: String, type: QiqBlockType): List<QiqSectionLocation> =
-        index(project, contextFile).definitions.filter { it.type == type && it.name == name }
+    /** Every `setSection` definition of [name] visible from [contextFile]. */
+    fun definitionsByName(project: Project, contextFile: VirtualFile, name: String): List<QiqSectionLocation> =
+        index(project, contextFile).definitions.filter { it.name == name }
 
-    /** Every usage of [name]/[type] visible from [contextFile]. */
-    fun usagesByName(project: Project, contextFile: VirtualFile, name: String, type: QiqBlockType): List<QiqSectionLocation> =
-        index(project, contextFile).usages.filter { it.type == type && it.name == name }
+    /** Every `getSection`/`hasSection` usage of [name] visible from [contextFile]. */
+    fun usagesByName(project: Project, contextFile: VirtualFile, name: String): List<QiqSectionLocation> =
+        index(project, contextFile).usages.filter { it.name == name }
 
     private val EMPTY = Index(emptyList(), emptyList())
 
@@ -113,10 +113,10 @@ object QiqSectionIndex {
                 remaining--
                 val text = readText(child) ?: continue
                 for (def in QiqSectionModel.definitions(text)) {
-                    definitions.add(QiqSectionLocation(child, def.name, def.type, def.nameRange))
+                    definitions.add(QiqSectionLocation(child, def.name, "setSection", def.nameRange))
                 }
                 for (use in QiqSectionModel.usages(text)) {
-                    usages.add(QiqSectionLocation(child, use.name, use.type, use.nameRange))
+                    usages.add(QiqSectionLocation(child, use.name, use.head, use.nameRange))
                 }
             }
         }

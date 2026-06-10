@@ -98,12 +98,14 @@
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
 
-        <!-- Cmd/Ctrl+click navigation on section/block names, both directions:
-             getSection('x') -> setSection definitions, setSection('x') ->
-             getSection usages, across the detected template roots. A
-             GotoDeclarationHandler (not a referenceContributor) so a name that
-             collides with a PHP function (e.g. 'header') is not suppressed by
-             PsiMultiReference preferring the hard PHP function reference. -->
+        <!-- Cmd/Ctrl+click navigation on Qiq section names, both directions:
+             getSection('x')/hasSection('x') -> setSection definitions,
+             setSection('x') -> getSection/hasSection usages, across the detected
+             template roots. A GotoDeclarationHandler (not a referenceContributor)
+             so a name that collides with a PHP function (e.g. 'header') is not
+             suppressed by PsiMultiReference preferring the hard PHP function
+             reference. (Blocks read with an argument-less getBlock(), so there is
+             no by-name block reader to navigate.) -->
         <gotoDeclarationHandler
                 order="first"
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqSectionGotoDeclarationHandler"/>
@@ -120,10 +122,11 @@
                 enabledByDefault="true"
                 level="WARNING"/>
 
-        <!-- Warn when getSection('x')/getBlock('x') reads a name no
-             setSection/setBlock defines under the detected template roots.
-             Conservative: only plain string literals, and suppressed when the
-             section index is empty (roots unresolved / nothing scanned). -->
+        <!-- Warn when getSection('x') reads a name no setSection defines under
+             the detected template roots. Conservative: hasSection('x') is not
+             flagged (it tests a possibly-absent name), only plain string literals
+             are checked, and the warning is suppressed when the section index is
+             empty (roots unresolved / nothing scanned). -->
         <localInspection
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqSectionNameInspection"
@@ -198,9 +201,9 @@
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqTemplatePathCompletionContributor"/>
 
-        <!-- Complete section/block names in getSection('...')/getBlock('...')
-             from the setSection/setBlock definitions under the resolved template
-             roots. Pairs with the section-name Go to Declaration. -->
+        <!-- Complete section names in getSection('...')/hasSection('...') from the
+             setSection definitions under the resolved template roots. Pairs with
+             the section-name Go to Declaration. -->
         <completion.contributor
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqSectionNameCompletionContributor"/>

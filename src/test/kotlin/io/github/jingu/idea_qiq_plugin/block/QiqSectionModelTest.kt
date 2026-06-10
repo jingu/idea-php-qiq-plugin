@@ -7,18 +7,14 @@ import kotlin.test.assertTrue
 class QiqSectionModelTest {
 
     @Test
-    fun extractsSectionAndBlockNames() {
+    fun extractsSectionDefinitions() {
         val text = """
             {{ setSection('header') }}<h1>x</h1>{{ endSection() }}
-            {{ setBlock("content") }}body{{ endBlock() }}
+            {{ setSection("body") }}body{{ endSection() }}
         """.trimIndent()
 
         val defs = QiqSectionModel.definitions(text)
-        assertEquals(2, defs.size)
-        assertEquals("header", defs[0].name)
-        assertEquals(QiqBlockType.SECTION, defs[0].type)
-        assertEquals("content", defs[1].name)
-        assertEquals(QiqBlockType.BLOCK, defs[1].type)
+        assertEquals(listOf("header", "body"), defs.map { it.name })
     }
 
     @Test
@@ -31,12 +27,13 @@ class QiqSectionModelTest {
     }
 
     @Test
-    fun ignoresReadersAndOtherDirectives() {
-        // getSection/getBlock are readers, not definitions; if/foreach are unrelated.
+    fun definitionsIgnoreReadersBlocksAndOtherDirectives() {
+        // getSection/hasSection are readers; setBlock is a block (not a section);
+        // if/foreach are unrelated.
         val text = """
             {{= ${'$'}this->getSection('header') }}
-            {{ if (${'$'}x): }}a{{ endif }}
-            {{= getBlock('content') }}
+            {{ if (${'$'}this->hasSection('header')): }}a{{ endif }}
+            {{ setBlock('content') }}x{{ endBlock() }}
         """.trimIndent()
         assertTrue(QiqSectionModel.definitions(text).isEmpty())
     }
@@ -44,16 +41,8 @@ class QiqSectionModelTest {
     @Test
     fun skipsEmptyOrMissingNames() {
         // Empty name is not a usable symbol; a no-arg call is not a definition.
-        val text = "{{ setSection('') }}x{{ endSection() }}{{ setBlock() }}y{{ endBlock() }}"
+        val text = "{{ setSection('') }}x{{ endSection() }}{{ setSection() }}y{{ endSection() }}"
         assertTrue(QiqSectionModel.definitions(text).isEmpty())
-    }
-
-    @Test
-    fun definitionsCarryTheirBlockType() {
-        val text = "{{ setSection('a') }}{{ endSection() }}{{ setBlock('b') }}{{ endBlock() }}"
-        val byType = QiqSectionModel.definitions(text).associate { it.name to it.type }
-        assertEquals(QiqBlockType.SECTION, byType["a"])
-        assertEquals(QiqBlockType.BLOCK, byType["b"])
     }
 
     @Test
@@ -63,18 +52,18 @@ class QiqSectionModelTest {
     }
 
     @Test
-    fun extractsGetSectionAndGetBlockUsages() {
+    fun extractsGetSectionAndHasSectionUsagesWithHead() {
         val text = """
             {{= ${'$'}this->getSection('header') }}
-            {{= getBlock('content') }}
+            {{ if (${'$'}this->hasSection('footer')): }}x{{ endif }}
         """.trimIndent()
 
         val usages = QiqSectionModel.usages(text)
         assertEquals(2, usages.size)
         assertEquals("header", usages[0].name)
-        assertEquals(QiqBlockType.SECTION, usages[0].type)
-        assertEquals("content", usages[1].name)
-        assertEquals(QiqBlockType.BLOCK, usages[1].type)
+        assertEquals("getSection", usages[0].head)
+        assertEquals("footer", usages[1].name)
+        assertEquals("hasSection", usages[1].head)
     }
 
     @Test
@@ -87,8 +76,8 @@ class QiqSectionModelTest {
 
     @Test
     fun usagesIgnoreDefinitionsAndSimilarNames() {
-        // setSection is a definition, not a usage; hasSection is unrelated.
-        val text = "{{ setSection('a') }}{{ endSection() }}{{ if (${'$'}this->hasSection('a')): }}x{{ endif }}"
+        // setSection is a definition, not a usage; getBlock has no name argument.
+        val text = "{{ setSection('a') }}{{ endSection() }}{{= getBlock() }}"
         assertTrue(QiqSectionModel.usages(text).isEmpty())
     }
 }
