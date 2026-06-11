@@ -70,6 +70,21 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun pairsThisQualifiedSectionCalls() {
+        // `{{ $this->setSection('x') }}` is the explicit form of `{{ setSection('x') }}`
+        // (Qiq compiles the bare call to `$this->...`); both must pair, including a
+        // mix of qualified opener and bare closer.
+        val qualified = "{{ ${'$'}this->setSection('adLocation') }}article{{ ${'$'}this->endSection() }}"
+        assertEquals(QiqBlockType.SECTION, ranges(qualified).single().type)
+
+        val mixed = "{{ ${'$'}this->setSection('x') }}body{{ endSection() }}"
+        assertEquals(QiqBlockType.SECTION, ranges(mixed).single().type)
+
+        // The qualified opener/closer is well-formed: no validation problem.
+        assertTrue(QiqBlockModel.validate(qualified).isEmpty())
+    }
+
+    @Test
     fun nestedSameTypeMatchesNearestPartner() {
         val text = """
             {{ if (${'$'}a): }}

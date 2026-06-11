@@ -77,28 +77,36 @@ class QiqPhpInjector : MultiHostInjector, DumbAware {
 
         val injectionHosts = collectInjectionHosts(file)
         val rawFragments = injectionHosts.mapNotNull { buildInjectionFragment(it) }
-        val fragments = applyStrictTypesPrelude(rawFragments, strictTypesEnabled)
+        val fragments = applyHeadPreludes(rawFragments, strictTypesEnabled)
         val plan = InjectionPlan(modificationStamp, strictTypesEnabled, fragments)
         file.putUserData(injectionPlanKey, plan)
         return plan
     }
 
     /**
-     * When the project setting "Strict Types" is on, prepend
-     * `<?php declare(strict_types=1); ?>` to the first injection fragment.
-     * IntelliJ assembles the virtual injected PHP file by concatenating
-     * fragment prefixes / hosts / suffixes in order, so a `declare`
-     * statement at the head of the first prefix makes the entire virtual
-     * file run under strict mode. This surfaces scalar→string mismatches
-     * such as `{{h true }}` or `{{h 123 }}` as PhpStorm warnings.
+     * Prepend file-head preludes to the first injection fragment. IntelliJ
+     * assembles the virtual injected PHP file by concatenating fragment
+     * prefixes / hosts / suffixes in order, so a hint at the head applies to the
+     * whole virtual file.
+     *
+     * - Always: a `@var \QiqTemplate $this` hint so explicit `$this->setSection(...)`
+     *   etc. resolve to the QiqTemplate stub (Go to Declaration, argument checks),
+     *   matching the bare-call form. The stub's `__call`/`__get` keep dynamic
+     *   helper/data access (`$this->helper(...)`, `$this->var`) from being flagged.
+     * - When the "Strict Types" setting is on: a leading
+     *   `declare(strict_types=1);` (kept first, as PHP requires) so scalar→string
+     *   mismatches such as `{{h true }}` surface as warnings.
      */
-    private fun applyStrictTypesPrelude(
+    private fun applyHeadPreludes(
         fragments: List<PhpInjectionFragment>,
-        enabled: Boolean,
+        strictTypesEnabled: Boolean,
     ): List<PhpInjectionFragment> {
-        if (!enabled || fragments.isEmpty()) return fragments
+        if (fragments.isEmpty()) return fragments
+        val prelude = buildString {
+            if (strictTypesEnabled) append("<?php declare(strict_types=1); ?>")
+            append("<?php /** @var \\QiqTemplate \$this */ ?>")
+        }
         val first = fragments.first()
-        val prelude = "<?php declare(strict_types=1); ?>"
         val newFirst = first.copy(prefix = prelude + (first.prefix.orEmpty()))
         return listOf(newFirst) + fragments.drop(1)
     }

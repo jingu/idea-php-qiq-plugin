@@ -12,16 +12,15 @@
  * --------------------------- */
 function render(string $path, ...$args): string {}
 function setLayout(string $path): void {}
+function getContent(): string { return ''; }
 
 /* ---------------------------
  * Blocks (functions)
  * --------------------------- */
 function setBlock(string $name): void {}
 function endBlock(): void {}
-/** @return string|null */
-function getBlock(string $name) {}
-/** @return string|null */
-function parentBlock(string $name) {}
+function getBlock(): string { return ''; }
+function parentBlock(): void {}
 
 /* ---------------------------
  * Sections (legacy 1.x/2.x functions)
@@ -165,23 +164,37 @@ function label($for, $text = null, array $attrs = []): string { return ''; }
  * ------------------------------------------------- */
 if (!class_exists('QiqTemplate')) {
     /**
-     * @internal IDE helper only: a minimal template class exposing methods
-     * that can be called from within template scope ($this->...()).
+     * @internal IDE helper only: the type used for `$this` inside templates.
+     *
+     * Extends the real \Qiq\Template (when installed) so `$this` is-a
+     * \Qiq\Template — passing `$this` to a helper typed `Qiq\Template $qiq`
+     * type-checks — while re-declaring the template methods as `public` so
+     * `$this->setSection(...)` etc. do not trip protected-member-access (the real
+     * methods are `protected` on Qiq\TemplateCore). Without Qiq installed the
+     * parent is unresolved but this class's own methods still resolve.
      */
-    class QiqTemplate
+    class QiqTemplate extends \Qiq\Template
     {
+        /* Magic methods (match Qiq\TemplateCore): data access via $this->var and
+         * helper dispatch via $this->helper(...), so a typed $this does not flag
+         * dynamic property/helper access as undefined. */
+        /** @return mixed */
+        public function __get(string $name) { return null; }
+        public function __isset(string $name): bool { return false; }
+        /** @return mixed */
+        public function __call(string $name, array $arguments) { return null; }
+
         /* Template control */
         public function render(string $path, ...$args): void {}
         public function setLayout(string $path): void {}
         public function extends(string $path): void {}
+        public function getContent(): string { return ''; }
 
         /* Blocks */
         public function setBlock(string $name): void {}
         public function endBlock(): void {}
-        /** @return string|null */
-        public function getBlock(string $name) {}
-        /** @return string|null */
-        public function parentBlock(string $name) {}
+        public function getBlock(): string { return ''; }
+        public function parentBlock(): void {}
 
         /* Sections (legacy) */
         public function setSection(string $name): void {}

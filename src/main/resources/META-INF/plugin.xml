@@ -98,6 +98,18 @@
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
 
+        <!-- Cmd/Ctrl+click navigation on Qiq section names, both directions:
+             getSection('x')/hasSection('x') -> setSection definitions,
+             setSection('x') -> getSection/hasSection usages, across the detected
+             template roots. A GotoDeclarationHandler (not a referenceContributor)
+             so a name that collides with a PHP function (e.g. 'header') is not
+             suppressed by PsiMultiReference preferring the hard PHP function
+             reference. (Blocks read with an argument-less getBlock(), so there is
+             no by-name block reader to navigate.) -->
+        <gotoDeclarationHandler
+                order="first"
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqSectionGotoDeclarationHandler"/>
+
         <!-- Warn when setLayout()/render()/extends()/include() reference a
              template that does not exist. Uses the same resolver as Go to
              Declaration, so a path is flagged exactly when Cmd/Ctrl+click would
@@ -107,6 +119,19 @@
                 implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqTemplatePathInspection"
                 groupKey="inspection.group.qiq"
                 key="inspection.template.path.name"
+                enabledByDefault="true"
+                level="WARNING"/>
+
+        <!-- Warn when getSection('x') reads a name no setSection defines under
+             the detected template roots. Conservative: hasSection('x') is not
+             flagged (it tests a possibly-absent name), only plain string literals
+             are checked, and the warning is suppressed when the section index is
+             empty (roots unresolved / nothing scanned). -->
+        <localInspection
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqSectionNameInspection"
+                groupKey="inspection.group.qiq"
+                key="inspection.section.name"
                 enabledByDefault="true"
                 level="WARNING"/>
 
@@ -138,6 +163,13 @@
         <lang.inspectionSuppressor
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqHelperInspectionSuppressor"/>
+
+        <!-- Suppress "Property accessed via magic method" for `$this->data` in
+             templates: Qiq reads template data through Qiq\TemplateCore::__get, so
+             with $this typed as the stub every data access would otherwise warn. -->
+        <lang.inspectionSuppressor
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.inspection.QiqTemplateFieldInspectionSuppressor"/>
 
         <!-- Argument check for helper calls. PhpStorm cannot check the
              arguments of an unresolved `helper(...)` call, so this compares the
@@ -175,6 +207,13 @@
         <completion.contributor
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqTemplatePathCompletionContributor"/>
+
+        <!-- Complete section names in getSection('...')/hasSection('...') from the
+             setSection definitions under the resolved template roots. Pairs with
+             the section-name Go to Declaration. -->
+        <completion.contributor
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqSectionNameCompletionContributor"/>
 
         <!-- ElementManipulators: required for refactorings (Rename, Move, etc.)
              to propagate edits made inside the injected PHP back to the Qiq host. -->
