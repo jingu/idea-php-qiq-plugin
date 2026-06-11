@@ -46,9 +46,11 @@ class QiqSectionNameInspection : LocalInspectionTool() {
             ?: return
 
         val index = QiqSectionIndex.index(call.project, contextFile)
-        // Skip only when nothing was scanned at all (roots unresolved); a project
-        // that has getSection usages but no definitions is exactly what we want to
-        // flag, so an empty *definitions* list alone must not silence the warning.
+        // Skip when nothing was scanned at all (roots unresolved) — a project that
+        // has getSection usages but no definitions is exactly what we want to flag,
+        // so an empty *definitions* list alone must not silence the warning — and
+        // when the scan was truncated, since a defining template may be unscanned.
+        if (index.truncated) return
         if (index.definitions.isEmpty() && index.usages.isEmpty()) return
         if (index.definitions.any { it.name == name }) return
 

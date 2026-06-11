@@ -1,5 +1,6 @@
 package io.github.jingu.idea_qiq_plugin.util
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil
 import com.intellij.openapi.progress.ProgressManager
@@ -45,11 +46,18 @@ data class QiqSectionLocation(
 object QiqSectionIndex {
 
     private const val MAX_FILES = 2000
+    private val log = Logger.getInstance(QiqSectionIndex::class.java)
 
-    /** Definitions and usages found under the roots discovered for [contextFile]. */
+    /**
+     * Definitions and usages found under the roots discovered for [contextFile].
+     * [truncated] is true when the [MAX_FILES] scan budget was exhausted, so the
+     * index may be incomplete — callers that must not produce false negatives
+     * (e.g. the undefined-name inspection) should back off when it is set.
+     */
     data class Index(
         val definitions: List<QiqSectionLocation>,
         val usages: List<QiqSectionLocation>,
+        val truncated: Boolean,
     )
 
     fun index(project: Project, contextFile: VirtualFile): Index {
@@ -74,7 +82,7 @@ object QiqSectionIndex {
     fun usagesByName(project: Project, contextFile: VirtualFile, name: String): List<QiqSectionLocation> =
         index(project, contextFile).usages.filter { it.name == name }
 
-    private val EMPTY = Index(emptyList(), emptyList())
+    private val EMPTY = Index(emptyList(), emptyList(), truncated = false)
 
     private fun compute(project: Project, contextFile: VirtualFile): Index {
         val settings = QiqSettingsService.getInstance(project) ?: return EMPTY
@@ -92,7 +100,13 @@ object QiqSectionIndex {
             budget = collect(root, exts, visited, definitions, usages, budget)
             if (budget <= 0) break
         }
-        return Index(definitions, usages)
+        // budget == 0 means the file cap was reached, so some templates may be
+        // unscanned; mark the index incomplete.
+        val truncated = budget <= 0
+        if (truncated) {
+            log.warn("Qiq section index hit the $MAX_FILES-file scan cap; results may be incomplete for ${contextFile.path}")
+        }
+        return Index(definitions, usages, truncated)
     }
 
     private fun collect(

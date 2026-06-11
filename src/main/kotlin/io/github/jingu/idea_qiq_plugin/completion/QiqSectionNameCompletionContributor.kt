@@ -50,26 +50,27 @@ class QiqSectionNameCompletionContributor : CompletionContributor() {
             val contextFile = (ilm.getTopLevelFile(parameters.originalFile) ?: parameters.originalFile)
                 .virtualFile ?: return
 
-            val typedPrefix = inQuotePrefix(literal, parameters.offset) ?: return
+            val typedPrefix = inQuotePrefix(literal.text, parameters.offset - literal.textRange.startOffset) ?: return
             val sink = result.withPrefixMatcher(PlainPrefixMatcher(typedPrefix, false))
 
             for (name in QiqSectionIndex.definedNames(project, contextFile)) {
                 sink.addElement(LookupElementBuilder.create(name).withTypeText("Qiq section", true))
             }
         }
+    }
 
+    companion object {
         /**
-         * The in-quote text before the caret, excluding the surrounding quotes.
-         * Returns null when the caret is at or past the closing quote, so the
-         * closing quote never leaks into the prefix; an unterminated literal
-         * (still being typed) has no closing quote, so its whole tail is included.
+         * The in-quote text before the caret ([caretInLiteral] offset from the
+         * literal start), excluding the surrounding quotes. Returns null when the
+         * caret is at or past the closing quote, so the closing quote never leaks
+         * into the prefix; an unterminated literal (still being typed) has no
+         * closing quote, so its whole tail is included. Pure, unit-tested.
          */
-        private fun inQuotePrefix(literal: StringLiteralExpression, caretOffset: Int): String? {
-            val text = literal.text
+        fun inQuotePrefix(text: String, caretInLiteral: Int): String? {
             if (text.isEmpty()) return null
             val quote = text[0]
             if (quote != '\'' && quote != '"') return null
-            val caretInLiteral = caretOffset - literal.textRange.startOffset
             if (caretInLiteral < 1) return null
             // Exclude a closing quote when the literal is terminated.
             val contentEnd = if (text.length >= 2 && text.last() == quote) text.length - 1 else text.length

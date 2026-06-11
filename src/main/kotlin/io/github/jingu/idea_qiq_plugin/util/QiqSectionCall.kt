@@ -1,6 +1,5 @@
 package io.github.jingu.idea_qiq_plugin.util
 
-import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.FunctionReference
 import com.jetbrains.php.lang.psi.elements.MethodReference
 import com.jetbrains.php.lang.psi.elements.ParameterList
@@ -48,21 +47,18 @@ object QiqSectionCall {
     }
 
     /**
-     * The lowercased call name, or null when it is not a Qiq-style call. A bare
-     * function call (`getSection(...)`) and a static call
-     * (`\QiqRuntimeFunctions::getSection(...)`) qualify; an instance call only
-     * when the receiver is exactly `$this`. Other receivers — another variable, a
-     * method chain (`$a->b()->getSection(...)`), a field (`$a->b->getSection(...)`)
-     * — are rejected so they do not produce false completion/navigation results.
+     * The lowercased call name, or null when it is not a Qiq-style call. Section
+     * readers/writers are bare global calls (`getSection(...)`) or `$this->...`
+     * methods in template scope; everything else — another variable, a static
+     * call (`Foo::getSection(...)`), a method chain (`$a->b()->getSection(...)`),
+     * a field (`$a->b->getSection(...)`) — is rejected so it does not produce
+     * false completion/navigation/inspection results.
      */
     private fun headOfCall(call: FunctionReference): String? {
         val name = call.name?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() } ?: return null
         if (call is MethodReference) {
-            when (val receiver = call.classReference) {
-                is Variable -> if (receiver.name != "this") return null
-                is ClassReference -> {} // static call
-                else -> return null
-            }
+            val receiver = call.classReference
+            if (receiver !is Variable || receiver.name != "this") return null
         }
         return name
     }
