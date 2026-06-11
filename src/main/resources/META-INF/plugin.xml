@@ -254,7 +254,7 @@
 <ul>
   <li><b>Section names as symbols</b>
     <ul>
-      <li>Completion of section names in <code>getSection('|')</code> / <code>hasSection('|')</code>, drawn from the <code>setSection</code> definitions across the detected template roots.</li>
+      <li>Completion of section names in <code>getSection('&hellip;')</code> / <code>hasSection('&hellip;')</code>, drawn from the <code>setSection</code> definitions across the detected template roots.</li>
       <li>Go to Declaration both ways: <code>getSection</code>/<code>hasSection</code> jump to the matching <code>setSection</code> definitions, and <code>setSection</code> jumps to its <code>getSection</code>/<code>hasSection</code> usages (the chooser shows each target's file and line). Works even when the name collides with a PHP function such as <code>'header'</code>.</li>
       <li>Inspection: a <code>getSection('x')</code> whose name no template defines is flagged (conservatively &mdash; <code>hasSection</code> is left alone, since it tests a possibly-absent name).</li>
     </ul>
