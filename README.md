@@ -20,6 +20,7 @@ Qiq Templates Support is an IntelliJ-based plugin that brings syntax highlightin
 - **Block matching & pair highlighting**: Qiq delimiters (`{{`, `{{=`, `{{h`, etc.) pair with their closing `}}` without matching braces from injected PHP or HTML, and the caret on a block opener/closer highlights its partner directive — nested same-keyword blocks resolve correctly.
 - **Structure view**: the Structure tool window (Alt+7 / Cmd+7) outlines sections/blocks by name, nested control blocks, and top-level `setLayout()`/`extends()` directives, with click-to-navigate.
 - **Block directive inspection**: warns on an unclosed opener, a closer with no opener, and a closer that doesn't match the nearest open block (`{{ foreach }}`…`{{ endif }}`).
+- **Section names as symbols**: section names complete in `getSection('…')` / `hasSection('…')` from the `setSection` definitions across the template roots; Go to Declaration jumps both ways (reader → definitions, `setSection` → usages, with file/line shown), even when a name collides with a PHP function; an inspection flags a `getSection('x')` that no template defines. `$this->`-qualified directives (`$this->setSection(...)` … `$this->endSection()`) fold, pair, resolve, and argument-check like the bare form.
 - **Enter/typing handlers** that auto-complete Qiq block closers and keep indentation consistent.
 - **Template discovery**: resolves relative paths by walking up from the current file, project roots, and PHP server document roots.
 
