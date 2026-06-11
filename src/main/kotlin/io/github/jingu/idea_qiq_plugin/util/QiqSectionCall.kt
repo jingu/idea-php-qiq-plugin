@@ -8,9 +8,9 @@ import com.jetbrains.php.lang.psi.elements.Variable
 import java.util.Locale
 
 /**
- * Recognizes the Qiq section calls — `setSection('name')` (the definition),
- * `getSection('name')` / `hasSection('name')` (the readers) — bare or
- * `$this->`-qualified. Shared by the name completion, navigation, and the
+ * Recognizes the Qiq section calls — `setSection`/`appendSection`/`prependSection`
+ * (the definitions), `getSection('name')` / `hasSection('name')` (the readers) —
+ * bare or `$this->`-qualified. Shared by the name completion, navigation, and the
  * undefined-name inspection so they agree on what counts as a section call.
  *
  * Only sections are handled here: blocks read with an argument-less `getBlock()`,
@@ -26,13 +26,15 @@ object QiqSectionCall {
      *  legitimately tests a possibly-absent name, so a missing one is not a bug. */
     private const val INSPECTABLE_READER = "getsection"
 
-    private const val WRITER_HEAD = "setsection"
+    /** Definition writers: a section is defined by replace/append/prepend, all
+     *  closed with `endSection()`. */
+    private val WRITER_HEADS = setOf("setsection", "appendsection", "prependsection")
 
     /** True if [literal] is the name argument of a `getSection`/`hasSection` reader. */
     fun isReaderArg(literal: StringLiteralExpression): Boolean = headOfArg(literal) in READER_HEADS
 
-    /** True if [literal] is the name argument of a `setSection` definition. */
-    fun isWriterArg(literal: StringLiteralExpression): Boolean = headOfArg(literal) == WRITER_HEAD
+    /** True if [literal] is the name argument of a `setSection`/`appendSection`/`prependSection` definition. */
+    fun isWriterArg(literal: StringLiteralExpression): Boolean = headOfArg(literal) in WRITER_HEADS
 
     /** True if [call] is a `getSection` reader (for the inspection; `hasSection` excluded). */
     fun isInspectableReader(call: FunctionReference): Boolean = headOfCall(call) == INSPECTABLE_READER

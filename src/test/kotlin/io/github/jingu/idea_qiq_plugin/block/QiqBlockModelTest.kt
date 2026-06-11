@@ -70,6 +70,25 @@ class QiqBlockModelTest {
     }
 
     @Test
+    fun pairsAppendAndPrependSectionWithEndSection() {
+        // A section is opened three ways — set/append/prepend — all closed by
+        // endSection(); append/prepend must pair just like setSection (#50).
+        val append = "{{ appendSection('a') }}x{{ endSection() }}"
+        assertEquals(QiqBlockType.SECTION, ranges(append).single().type)
+
+        val prepend = "{{ ${'$'}this->prependSection('b') }}y{{ ${'$'}this->endSection() }}"
+        assertEquals(QiqBlockType.SECTION, ranges(prepend).single().type)
+    }
+
+    @Test
+    fun appendAndPrependSectionAreNotUnmatchedClosers() {
+        // Regression (#50): with only setSection known as an opener, the endSection()
+        // after append/prepend was wrongly flagged as an unmatched closer.
+        assertTrue(QiqBlockModel.validate("{{ appendSection('a') }}x{{ endSection() }}").isEmpty())
+        assertTrue(QiqBlockModel.validate("{{ prependSection('b') }}y{{ endSection() }}").isEmpty())
+    }
+
+    @Test
     fun pairsThisQualifiedSectionCalls() {
         // `{{ $this->setSection('x') }}` is the explicit form of `{{ setSection('x') }}`
         // (Qiq compiles the bare call to `$this->...`); both must pair, including a

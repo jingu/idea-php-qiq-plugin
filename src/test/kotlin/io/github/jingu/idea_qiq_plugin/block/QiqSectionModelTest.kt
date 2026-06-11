@@ -18,6 +18,21 @@ class QiqSectionModelTest {
     }
 
     @Test
+    fun recognisesAppendAndPrependSectionAsDefinitions() {
+        // A section is also defined by appendSection/prependSection, not just
+        // setSection (#50); each definition records the head as written.
+        val text = """
+            {{ setSection('a') }}x{{ endSection() }}
+            {{ appendSection('b') }}y{{ endSection() }}
+            {{ ${'$'}this->prependSection('c') }}z{{ endSection() }}
+        """.trimIndent()
+
+        val defs = QiqSectionModel.definitions(text)
+        assertEquals(listOf("a", "b", "c"), defs.map { it.name })
+        assertEquals(listOf("setSection", "appendSection", "prependSection"), defs.map { it.head })
+    }
+
+    @Test
     fun nameRangePointsAtTheNameInsideQuotes() {
         val text = "{{ setSection('header') }}"
         val def = QiqSectionModel.definitions(text).single()

@@ -3,12 +3,14 @@ package io.github.jingu.idea_qiq_plugin.block
 import com.intellij.openapi.util.TextRange
 
 /**
- * A section name *definition* — a `setSection('name')` directive — found in raw
- * template text. [nameRange] is the span of the name itself (inside the quotes),
- * so a reference can navigate straight to the name.
+ * A section name *definition* — a `setSection`/`appendSection`/`prependSection`
+ * directive — found in raw template text. [head] is the directive name as written
+ * (so a navigation target can label itself accurately), and [nameRange] is the span
+ * of the name itself (inside the quotes), so a reference can navigate straight to it.
  */
 data class QiqSectionDef(
     val name: String,
+    val head: String,
     val nameRange: TextRange,
 )
 
@@ -45,8 +47,10 @@ object QiqSectionModel {
     private val READER = Regex("(?i)(?:\\\$this\\s*->\\s*|(?<![-:>\\w\$]))(getSection|hasSection)\\s*\\(\\s*(['\"])(.*?)\\2")
 
     /**
-     * Every `setSection` name definition in [text], in document order. Directives
-     * with no quoted name, or an empty name, are skipped.
+     * Every section name definition in [text], in document order — `setSection`,
+     * `appendSection`, and `prependSection` all define a section (they differ only in
+     * how Qiq merges content). Directives with no quoted name, or an empty name, are
+     * skipped.
      */
     fun definitions(text: CharSequence): List<QiqSectionDef> {
         val result = ArrayList<QiqSectionDef>()
@@ -54,7 +58,7 @@ object QiqSectionModel {
             if (QiqBlockModel.openerTypeOf(directive.inner) != QiqBlockType.SECTION) continue
             val nameRange = firstArgQuotedRange(text, directive.range) ?: continue
             if (nameRange.isEmpty) continue
-            result.add(QiqSectionDef(text.substring(nameRange.startOffset, nameRange.endOffset), nameRange))
+            result.add(QiqSectionDef(text.substring(nameRange.startOffset, nameRange.endOffset), directive.head, nameRange))
         }
         return result
     }
