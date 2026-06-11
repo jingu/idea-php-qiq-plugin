@@ -252,30 +252,22 @@
     </actions>
     <change-notes><![CDATA[
 <ul>
-  <li><b>Code folding for Qiq blocks</b>
+  <li><b>Section names as symbols</b>
     <ul>
-      <li><code>{{ if (...): }}</code>&hellip;<code>{{ endif }}</code>, <code>foreach</code>, <code>for</code>, <code>setSection</code>, and <code>setBlock</code> blocks can be collapsed. Only the body folds, so a collapsed block still reads as <code>{{ if (...): }}&hellip;{{ endif }}</code>.</li>
+      <li>Completion of section names in <code>getSection('&hellip;')</code> / <code>hasSection('&hellip;')</code>, drawn from the <code>setSection</code> definitions across the detected template roots.</li>
+      <li>Go to Declaration both ways: <code>getSection</code>/<code>hasSection</code> jump to the matching <code>setSection</code> definitions, and <code>setSection</code> jumps to its <code>getSection</code>/<code>hasSection</code> usages (the chooser shows each target's file and line). Works even when the name collides with a PHP function such as <code>'header'</code>.</li>
+      <li>Inspection: a <code>getSection('x')</code> whose name no template defines is flagged (conservatively &mdash; <code>hasSection</code> is left alone, since it tests a possibly-absent name).</li>
     </ul>
   </li>
-  <li><b>Block matching &amp; brace highlighting</b>
+  <li><b><code>$this-&gt;</code>-qualified Qiq calls</b>
     <ul>
-      <li>Qiq delimiters (<code>{{</code> / <code>{{=</code> / <code>{{h</code> / <code>{{a</code> / <code>{{c</code> / <code>{{j</code> / <code>{{u</code>) pair with their closing <code>}}</code>, without ever pairing against a brace from injected PHP or surrounding HTML.</li>
-      <li>Resting the caret on a block opener or closer highlights its partner directive &mdash; nested same-keyword blocks (<code>if</code> inside <code>if</code>) resolve to the correct partner.</li>
+      <li><code>{{ $this-&gt;setSection('x') }}</code>&hellip;<code>{{ $this-&gt;endSection() }}</code> now fold, pair, and validate like the bare form.</li>
+      <li><code>$this-&gt;setSection(...)</code> and the other template methods resolve for Go to Declaration and argument checks, while dynamic data (<code>$this-&gt;var</code>) and helper calls keep working without false warnings.</li>
     </ul>
   </li>
-  <li><b>Structure view (outline)</b>
+  <li><b>Unified template-path resolution</b>
     <ul>
-      <li>The Structure tool window (Alt+7 / Cmd+7) shows <code>setSection</code>/<code>setBlock</code> by name, nested control blocks (<code>if</code>/<code>foreach</code>/<code>for</code>), and top-level <code>setLayout()</code>/<code>extends()</code> directives. Clicking a node navigates to the directive.</li>
-    </ul>
-  </li>
-  <li><b>Inspection: unclosed / mismatched block directives</b>
-    <ul>
-      <li>Warns on an opener that is never closed (<code>{{ if (...): }}</code> without <code>{{ endif }}</code>), a closer with no opener, and a closer that does not match the nearest open block (e.g. <code>{{ foreach }}</code>&hellip;<code>{{ endif }}</code>).</li>
-    </ul>
-  </li>
-  <li><b>More accurate Enter auto-close</b>
-    <ul>
-      <li>Pressing Enter after a block opener now uses the same block pairing as folding/matching, so semicolon-terminated closers (<code>{{ endif; }}</code>) are recognised and a duplicate closer is no longer inserted.</li>
+      <li>Path completion, Go to Declaration, and the missing-template inspection now share a single resolver, so a path that completes is a path that navigates and is not falsely flagged &mdash; removing edge-case disagreements in unusual template layouts.</li>
     </ul>
   </li>
 </ul>
