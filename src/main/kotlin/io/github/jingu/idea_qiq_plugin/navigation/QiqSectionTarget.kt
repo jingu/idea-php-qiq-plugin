@@ -56,9 +56,11 @@ class QiqSectionTarget(
     private val pathAndLine: String
         get() {
             val virtualFile = file.virtualFile ?: return file.name
-            val base = file.project.basePath
-            val path = if (base != null && virtualFile.path.startsWith(base)) {
-                virtualFile.path.removePrefix(base).removePrefix("/")
+            // Compare against `base/` (not `base`) so a sibling like `/proj2` is
+            // not treated as project-relative to base `/proj`.
+            val base = file.project.basePath?.removeSuffix("/")
+            val path = if (base != null && virtualFile.path.startsWith("$base/")) {
+                virtualFile.path.removePrefix("$base/")
             } else {
                 virtualFile.path
             }

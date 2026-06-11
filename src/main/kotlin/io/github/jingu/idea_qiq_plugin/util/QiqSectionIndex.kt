@@ -2,10 +2,10 @@ package io.github.jingu.idea_qiq_plugin.util
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.openapi.fileEditor.impl.LoadTextUtil
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.CachedValueProvider
@@ -143,6 +143,6 @@ object QiqSectionIndex {
     /** Unsaved editor content when the file is open, else the on-disk text. */
     private fun readText(file: VirtualFile): CharSequence? {
         FileDocumentManager.getInstance().getCachedDocument(file)?.let { return it.charsSequence }
-        return runCatching { LoadTextUtil.loadText(file) }.getOrNull()
+        return runCatching { VfsUtilCore.loadText(file) }.getOrNull()
     }
 }
