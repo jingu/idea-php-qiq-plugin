@@ -1,6 +1,7 @@
 package io.github.jingu.idea_qiq_plugin.lang
 
 import com.intellij.lang.injection.InjectedLanguageManager
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
 import com.intellij.psi.templateLanguages.TemplateLanguageFileViewProvider
 
@@ -29,5 +30,17 @@ object QiqInjectionSupport {
         if (name.endsWith(".qiq") || name.endsWith(".qiq.php")) return true
 
         return vf.getUserData(QiqFileTypeOverrider.QIQ_MARKER) == true
+    }
+
+    /**
+     * Whether [file] is a Qiq template file, judged from the file alone (no PSI) —
+     * for VFS walks that classify candidate files. Recognizes the Qiq file type,
+     * the `.qiq` / `.qiq.php` names, and a file re-typed via the overrider marker.
+     */
+    fun isQiqTemplateFile(file: VirtualFile): Boolean {
+        if (file.fileType == QiqFileType) return true
+        val name = file.name
+        if (name.endsWith(".qiq", ignoreCase = true) || name.endsWith(".qiq.php", ignoreCase = true)) return true
+        return file.getUserData(QiqFileTypeOverrider.QIQ_MARKER) == true
     }
 }

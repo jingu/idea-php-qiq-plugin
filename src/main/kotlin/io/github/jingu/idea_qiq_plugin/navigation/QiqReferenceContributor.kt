@@ -10,6 +10,7 @@ import com.jetbrains.php.lang.psi.elements.FunctionReference
 import com.jetbrains.php.lang.psi.elements.ParameterList
 import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import io.github.jingu.idea_qiq_plugin.lang.QiqInjectionSupport
+import io.github.jingu.idea_qiq_plugin.util.QiqTemplateResolver
 import io.github.jingu.idea_qiq_plugin.util.QiqUtil
 
 class QiqReferenceContributor : PsiReferenceContributor() {
@@ -62,6 +63,42 @@ class QiqIncludeReference(
         val result = QiqUtil.findTemplateByPath(element.project, path, contextFile)
 
         return result
+    }
+
+    /**
+     * True when [element] is one of the template files this path resolves to. A
+     * path can resolve to several candidates (different roots/extensions), so
+     * membership in the full resolved set — not just the first match [resolve]
+     * returns — is what makes Find Usages and Rename see every referencing call.
+     */
+    override fun isReferenceTo(element: PsiElement): Boolean {
+        val targetFile = (element as? PsiFileSystemItem)?.virtualFile ?: return false
+        val contextFile = contextVirtualFile ?: this.element.containingFile?.virtualFile
+        return QiqTemplateResolver.resolve(this.element.project, path, contextFile).any { it == targetFile }
+    }
+
+    /**
+     * Rewrite only the path's final segment when the referenced template file is
+     * renamed, keeping the directory prefix and the original extension style
+     * (see [QiqTemplateResolver.renamedPath]). The default would replace the whole
+     * path range with the bare new file name, dropping the directory.
+     */
+    override fun handleElementRename(newElementName: String): PsiElement {
+        val extensions = QiqTemplateResolver.candidateExtensions(element.project)
+        return super.handleElementRename(QiqTemplateResolver.renamedPath(path, newElementName, extensions))
+    }
+
+    /**
+     * Renaming a *file* rebinds its references to the new file via [bindToElement]
+     * (not [handleElementRename]) — and [PsiReferenceBase]'s default throws — so a
+     * file rename would otherwise leave the path strings untouched. Recompute the
+     * path's final segment from the new file's name, preserving the directory and
+     * extension style, exactly as [handleElementRename] does for the name path.
+     */
+    override fun bindToElement(element: PsiElement): PsiElement {
+        val newFile = (element as? PsiFileSystemItem)?.virtualFile ?: return this.element
+        val extensions = QiqTemplateResolver.candidateExtensions(this.element.project)
+        return super.handleElementRename(QiqTemplateResolver.renamedPath(path, newFile.name, extensions))
     }
 
     override fun getVariants(): Array<Any> = emptyArray()
