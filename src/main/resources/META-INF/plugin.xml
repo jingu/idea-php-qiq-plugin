@@ -74,6 +74,18 @@
                 language="Qiq"
                 implementationClass="io.github.jingu.idea_qiq_plugin.structure.QiqStructureViewFactory"/>
 
+        <!-- Reformat Code for Qiq templates: indents the body of each block
+             directive (if/foreach/for/setSection/setBlock) one level and aligns
+             closers with openers, delegating HTML and injected PHP to their own
+             formatters via the template-language formatting framework. The indent
+             is derived from QiqBlockModel nesting depth, since the parser PSI is
+             flat. -->
+        <lang.formatter
+                language="Qiq"
+                implementationClass="io.github.jingu.idea_qiq_plugin.editor.QiqFormattingModelBuilder"/>
+        <postFormatProcessor
+                implementation="io.github.jingu.idea_qiq_plugin.editor.QiqPostFormatProcessor"/>
+
         <!-- Warn on structurally invalid Qiq blocks: unclosed openers, closers
              with no opener, and closers that do not match the nearest open
              block. Shares the block-range model with folding/matching/structure. -->
