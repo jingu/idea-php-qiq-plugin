@@ -18,8 +18,9 @@ import io.github.jingu.idea_qiq_plugin.util.QiqTemplateResolver
  * processor claims Qiq template files ([QiqTemplateResolver.isTemplateTarget]) and
  * collects references with a plain [ReferencesSearch], which runs
  * [QiqTemplateReferenceSearcher] (alongside any PHP reference search), so every
- * referencing call is found and rewritten via
- * [QiqIncludeReference.handleElementRename] when the file is renamed.
+ * referencing call is found and rewritten by `QiqIncludeReference` itself
+ * (`handleElementRename` / `bindToElement`, whichever the platform's rename path
+ * invokes) when the file is renamed.
  *
  * Scoped to files under a detected template root, so ordinary PHP source files are
  * still handled by PhpStorm's processor.

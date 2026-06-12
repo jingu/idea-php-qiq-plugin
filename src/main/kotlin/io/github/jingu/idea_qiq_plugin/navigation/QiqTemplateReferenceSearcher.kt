@@ -2,6 +2,7 @@ package io.github.jingu.idea_qiq_plugin.navigation
 
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.application.QueryExecutorBase
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.vfs.VfsUtilCore
@@ -65,6 +66,12 @@ class QiqTemplateReferenceSearcher :
         for (root in roots) {
             budget = scan(root, baseName, target, scope, psiManager, ilm, visited, consumer, stopped, budget)
             if (budget <= 0 || stopped[0]) break
+        }
+        // Budget exhausted (not an early consumer stop) means some templates went
+        // unscanned, so the usage list may be incomplete — risky for Rename, which
+        // would then silently leave those references unupdated. Surface it.
+        if (budget <= 0 && !stopped[0]) {
+            log.warn("Qiq template reference search hit the $MAX_FILES-file scan cap; some usages of ${targetFile.path} may be missing")
         }
     }
 
@@ -134,5 +141,6 @@ class QiqTemplateReferenceSearcher :
 
     private companion object {
         private const val MAX_FILES = 2000
+        private val log = Logger.getInstance(QiqTemplateReferenceSearcher::class.java)
     }
 }
