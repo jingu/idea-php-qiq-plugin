@@ -89,11 +89,12 @@ class QiqIncludeReference(
     }
 
     /**
-     * Renaming a *file* rebinds its references to the new file via [bindToElement]
-     * (not [handleElementRename]) — and [PsiReferenceBase]'s default throws — so a
-     * file rename would otherwise leave the path strings untouched. Recompute the
-     * path's final segment from the new file's name, preserving the directory and
-     * extension style, exactly as [handleElementRename] does for the name path.
+     * Some rename paths rebind a reference to the new file via [bindToElement]
+     * rather than [handleElementRename], and [PsiReferenceBase]'s default throws —
+     * so this is implemented alongside [handleElementRename] to cover whichever the
+     * platform invokes. Recompute the path's final segment from the new file's
+     * name, preserving the directory and extension style, exactly as
+     * [handleElementRename] does for the name path.
      */
     override fun bindToElement(element: PsiElement): PsiElement {
         val newFile = (element as? PsiFileSystemItem)?.virtualFile ?: return this.element

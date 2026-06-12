@@ -103,8 +103,9 @@
              a dedicated referencesSearch executor scans the template roots and
              reports every setLayout/render/extends/include('...') (and helper path
              arg) resolving to the target. The handler factory makes Find Usages
-             available on a .qiq / .qiq.php file; renaming the file rewrites the
-             referencing path strings via QiqIncludeReference.handleElementRename. -->
+             available on a .qiq / .qiq.php file; on rename, QiqIncludeReference
+             rewrites its own path string (handleElementRename / bindToElement,
+             whichever the platform's rename path invokes). -->
         <referencesSearch
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqTemplateReferenceSearcher"/>
         <findUsagesHandlerFactory
