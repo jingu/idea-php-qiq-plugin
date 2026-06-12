@@ -155,6 +155,46 @@ object QiqTemplateResolver {
         return null
     }
 
+    /**
+     * Whether [file] should be treated as a Find-Usages / Rename target — a Qiq
+     * template the plugin owns. A `.qiq` / `.qiq.php` file always qualifies; a file
+     * with another configured candidate extension (commonly `.php`, since Qiq
+     * renders plain-PHP partials) qualifies only when it sits under a detected
+     * template root, so ordinary PHP files elsewhere in the project are not
+     * mistaken for templates. The cheap extension test runs before the root walk.
+     */
+    fun isTemplateTarget(project: Project, file: VirtualFile): Boolean {
+        if (file.isDirectory) return false
+        val name = file.name
+        if (name.endsWith(".qiq", ignoreCase = true) || name.endsWith(".qiq.php", ignoreCase = true)) return true
+        val extensions = candidateExtensions(project)
+        if (extensions.none { name.endsWith(it, ignoreCase = true) }) return false
+        val settings = QiqSettingsService.getInstance(project) ?: return false
+        val roots = LinkedHashSet<VirtualFile>()
+        roots.addAll(settings.resolveTemplateRoots(file))
+        settings.resolveTemplateBase(file)?.let { roots.add(it) }
+        return roots.any { VfsUtilCore.isAncestor(it, file, false) }
+    }
+
+    /**
+     * The path string to write into a referencing call when the template file
+     * [oldPath] points at is renamed to [newFileName]. Only the final path
+     * segment's base name changes; the directory prefix is preserved, as is
+     * whether the original path spelled out a template extension — so a bare
+     * `layouts/main` stays bare (`layouts/home`) and an explicit
+     * `layouts/main.qiq.php` keeps its extension (`layouts/home.qiq.php`). The
+     * leading-slash form of a root-absolute path is part of the directory prefix
+     * and so is preserved too. Pure, unit-tested.
+     */
+    fun renamedPath(oldPath: String, newFileName: String, extensions: List<String>): String {
+        val lastSlash = oldPath.lastIndexOf('/')
+        val directory = oldPath.substring(0, lastSlash + 1) // "" when there is no slash
+        val oldSegment = oldPath.substring(lastSlash + 1)
+        val oldHadExtension = stripTemplateExtension(oldSegment, extensions) != null
+        val newSegment = if (oldHadExtension) newFileName else stripTemplateExtension(newFileName, extensions) ?: newFileName
+        return directory + newSegment
+    }
+
     private fun addMatchesUnder(root: VirtualFile, candidates: List<String>, out: MutableSet<VirtualFile>) {
         for (candidate in candidates) {
             val vf = root.findFileByRelativePath(candidate) ?: continue

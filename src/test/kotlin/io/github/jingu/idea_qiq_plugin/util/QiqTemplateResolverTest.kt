@@ -45,6 +45,36 @@ class QiqTemplateResolverTest {
         assertEquals("layout/base.qiq", QiqTemplateResolver.stripTemplateExtension("layout/base.qiq.php", listOf(".php")))
     }
 
+    // --- renamedPath ---------------------------------------------------------
+
+    @Test
+    fun renamesBareRelativePathKeepingDirectory() {
+        // `layouts/main` + main.qiq.php -> home.qiq.php => `layouts/home` (stays bare).
+        assertEquals("layouts/home", QiqTemplateResolver.renamedPath("layouts/main", "home.qiq.php", exts))
+    }
+
+    @Test
+    fun renamesPathThatSpelledOutTheExtension() {
+        // An explicit extension in the original is preserved with the new name.
+        assertEquals("layouts/home.qiq.php", QiqTemplateResolver.renamedPath("layouts/main.qiq.php", "home.qiq.php", exts))
+    }
+
+    @Test
+    fun renamesRootAbsolutePathKeepingLeadingSlash() {
+        assertEquals("/layouts/home", QiqTemplateResolver.renamedPath("/layouts/main", "home.qiq.php", exts))
+    }
+
+    @Test
+    fun renamesBareNameWithoutDirectory() {
+        assertEquals("home", QiqTemplateResolver.renamedPath("main", "home.qiq.php", exts))
+    }
+
+    @Test
+    fun renameOnlyTouchesTheFinalSegment() {
+        // A directory segment that happens to share the base name is left alone.
+        assertEquals("main/home", QiqTemplateResolver.renamedPath("main/main", "home.qiq.php", exts))
+    }
+
     // --- buildCandidatePaths -------------------------------------------------
 
     @Test

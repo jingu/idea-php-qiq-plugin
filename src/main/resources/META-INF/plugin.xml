@@ -98,6 +98,25 @@
         <psi.referenceContributor
                 implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqReferenceContributor"/>
 
+        <!-- Find Usages + Rename for template files. The path references live in
+             injected PHP, which the word-index reference search does not reach, so
+             a dedicated referencesSearch executor scans the template roots and
+             reports every setLayout/render/extends/include('...') (and helper path
+             arg) resolving to the target. The handler factory makes Find Usages
+             available on a .qiq / .qiq.php file; on rename, QiqIncludeReference
+             rewrites its own path string (handleElementRename / bindToElement,
+             whichever the platform's rename path invokes). -->
+        <referencesSearch
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqTemplateReferenceSearcher"/>
+        <findUsagesHandlerFactory
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqTemplateFindUsagesHandlerFactory"/>
+        <!-- Claim the rename of a Qiq template file before PhpStorm's own
+             PhpFileRenameProcessor (which would not search the injected path
+             references) so renaming the file rewrites every referencing call. -->
+        <renamePsiElementProcessor
+                order="first"
+                implementation="io.github.jingu.idea_qiq_plugin.navigation.QiqTemplateRenameProcessor"/>
+
         <!-- Cmd/Ctrl+click navigation on Qiq section names, both directions:
              getSection('x')/hasSection('x') -> setSection definitions,
              setSection('x') -> getSection/hasSection usages, across the detected
