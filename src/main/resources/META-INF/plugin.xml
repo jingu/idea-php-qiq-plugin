@@ -234,6 +234,21 @@
                 language="PHP"
                 implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqSectionNameCompletionContributor"/>
 
+        <!-- Complete Qiq directive keywords (if/foreach/for + else/end*, and the
+             setSection/getSection/setLayout/extends template API) at the head of a
+             plain {{ }} block. The directive content is injected PHP, so this is a
+             PHP completion contributor gated to the directive-head position. -->
+        <completion.contributor
+                language="PHP"
+                implementationClass="io.github.jingu.idea_qiq_plugin.completion.QiqDirectiveCompletionContributor"/>
+
+        <!-- Live Templates for Qiq blocks (qif / qforeach / qfor / qsection /
+             qblock / qlayout), available inside .qiq / .qiq.php files. -->
+        <liveTemplateContext
+                contextId="QIQ"
+                implementation="io.github.jingu.idea_qiq_plugin.liveTemplate.QiqLiveTemplateContextType"/>
+        <defaultLiveTemplates file="liveTemplates/Qiq"/>
+
         <!-- ElementManipulators: required for refactorings (Rename, Move, etc.)
              to propagate edits made inside the injected PHP back to the Qiq host. -->
         <lang.elementManipulator

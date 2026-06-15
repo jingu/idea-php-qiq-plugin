@@ -1,0 +1,41 @@
+<templateSet group="Qiq">
+  <template name="qif" value="{{ if ($EXPR$): }}&#10;$END$&#10;{{ endif }}" description="Qiq: if block" toReformat="false" toShortenFQNames="false">
+    <variable name="EXPR" expression="" defaultValue="" alwaysStopAt="true" />
+    <context>
+      <option name="QIQ" value="true" />
+    </context>
+  </template>
+  <template name="qforeach" value="{{ foreach ($ITEMS$ as $ITEM$): }}&#10;$END$&#10;{{ endforeach }}" description="Qiq: foreach block" toReformat="false" toShortenFQNames="false">
+    <variable name="ITEMS" expression="" defaultValue="" alwaysStopAt="true" />
+    <variable name="ITEM" expression="" defaultValue="" alwaysStopAt="true" />
+    <context>
+      <option name="QIQ" value="true" />
+    </context>
+  </template>
+  <template name="qfor" value="{{ for ($INIT$; $COND$; $STEP$): }}&#10;$END$&#10;{{ endfor }}" description="Qiq: for block" toReformat="false" toShortenFQNames="false">
+    <variable name="INIT" expression="" defaultValue="" alwaysStopAt="true" />
+    <variable name="COND" expression="" defaultValue="" alwaysStopAt="true" />
+    <variable name="STEP" expression="" defaultValue="" alwaysStopAt="true" />
+    <context>
+      <option name="QIQ" value="true" />
+    </context>
+  </template>
+  <template name="qsection" value="{{ setSection('$NAME$') }}&#10;$END$&#10;{{ endSection() }}" description="Qiq: setSection block" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="" alwaysStopAt="true" />
+    <context>
+      <option name="QIQ" value="true" />
+    </context>
+  </template>
+  <template name="qblock" value="{{ setBlock('$NAME$') }}&#10;$END$&#10;{{ endBlock() }}" description="Qiq: setBlock block" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="" alwaysStopAt="true" />
+    <context>
+      <option name="QIQ" value="true" />
+    </context>
+  </template>
+  <template name="qlayout" value="{{ setLayout('$NAME$') }}$END$" description="Qiq: setLayout" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="" alwaysStopAt="true" />
+    <context>
+      <option name="QIQ" value="true" />
+    </context>
+  </template>
+</templateSet>
