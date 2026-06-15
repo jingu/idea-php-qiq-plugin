@@ -24,6 +24,9 @@ import io.github.jingu.idea_qiq_plugin.block.QiqBlockModel
  */
 object QiqReindent {
 
+    /** Sentinel in [computeLineIndents]'s result: leave the line's indent verbatim. */
+    const val LEAVE_AS_IS = -1
+
     // Elements that never have a closing tag, so they must not push HTML depth.
     private val VOID_ELEMENTS = setOf(
         "area", "base", "br", "col", "embed", "hr", "img", "input",
@@ -46,6 +49,11 @@ object QiqReindent {
      * The target indent width (in spaces) for each line of [text], using
      * [indentSize] spaces per level. Index `i` is line `i` (0-based, in document
      * order).
+     *
+     * A value of `-1` means "leave this line's existing indentation untouched":
+     * the interiors of `<?php … ?>` islands and `<!-- … -->` comments are preserved
+     * verbatim (including tab vs. space), so callers must skip rewriting those lines
+     * rather than materialise the width as spaces.
      */
     fun computeLineIndents(text: CharSequence, indentSize: Int): IntArray {
         val lineStarts = lineStartOffsets(text)
@@ -93,7 +101,7 @@ object QiqReindent {
             when (role[i]) {
                 Role.QIQ_INTERIOR -> result[i] = openIndent[spanOf[i]] + indentSize
                 Role.QIQ_CLOSE -> result[i] = openIndent[spanOf[i]]
-                Role.PRESERVE -> result[i] = leadingWidth(text, lineStart, lineEnd, indentSize)
+                Role.PRESERVE -> result[i] = LEAVE_AS_IS
                 Role.NORMAL -> {
                     val level = (depth - if (dedent[i]) 1 else 0).coerceAtLeast(0)
                     result[i] = level * indentSize
@@ -116,13 +124,22 @@ object QiqReindent {
 
     /** `{{ … }}` directives, `<?php … ?>`, and `<!-- … -->` comments, by start. */
     private fun opaqueSpans(text: CharSequence): List<Span> {
-        val spans = ArrayList<Span>()
+        // PHP islands and HTML comments first: a `{{ … }}` that falls inside one of
+        // them is opaque text (a string/heredoc/comment), not a Qiq directive, so it
+        // must not be registered as its own Qiq span — otherwise a multi-line
+        // `{{ … }}` nested there would later claim QIQ_INTERIOR/QIQ_CLOSE roles and
+        // reindent lines inside the island.
+        val nonQiq = ArrayList<Span>()
+        addDelimited(text, "<?php", "?>", nonQiq)
+        addDelimited(text, "<?=", "?>", nonQiq)
+        addDelimited(text, "<!--", "-->", nonQiq)
+
+        val spans = ArrayList<Span>(nonQiq)
         for (directive in QiqBlockModel.scanDirectives(text)) {
-            spans.add(Span(directive.range.startOffset, directive.range.endOffset, qiq = true))
+            val start = directive.range.startOffset
+            if (nonQiq.any { start >= it.start && start < it.end }) continue
+            spans.add(Span(start, directive.range.endOffset, qiq = true))
         }
-        addDelimited(text, "<?php", "?>", spans)
-        addDelimited(text, "<?=", "?>", spans)
-        addDelimited(text, "<!--", "-->", spans)
         return spans.sortedBy { it.start }
     }
 
@@ -222,20 +239,6 @@ object QiqReindent {
             if (c != ' ' && c != '\t' && c != '\r' && c != '\n') return false
         }
         return true
-    }
-
-    private fun leadingWidth(text: CharSequence, start: Int, end: Int, indentSize: Int): Int {
-        var width = 0
-        var i = start
-        while (i < end) {
-            when (text[i]) {
-                ' ' -> width++
-                '\t' -> width += indentSize
-                else -> return width
-            }
-            i++
-        }
-        return width
     }
 
     private fun lineOf(lineStarts: IntArray, offset: Int): Int {

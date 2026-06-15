@@ -40,8 +40,10 @@ class QiqReindentTest {
 
     @Test
     fun preservesPhpIslandLinesAndKeepsItAtColumnZero() {
+        // The island interior is marked LEAVE_AS_IS (-1) so its indentation is kept
+        // verbatim; only the `<?php` opener line and the Qiq block are reindented.
         val text = "<?php\n${'$'}x = 1;\n?>\n{{ if (${'$'}a): }}\nx\n{{ endif }}"
-        assertContentEquals(intArrayOf(0, 0, 0, 0, 4, 0), indents(text))
+        assertContentEquals(intArrayOf(0, -1, -1, 0, 4, 0), indents(text))
     }
 
     @Test
@@ -60,8 +62,17 @@ class QiqReindentTest {
         // A <?php ?> island inside a block: the opener indents, but the PHP body is
         // left exactly as written (no reflow).
         val text = "{{ if (${'$'}a): }}\n<?php\n  ${'$'}x = 1;\n?>\n{{ endif }}"
-        // opener(0) -> <?php opening line at depth 1 (4); body & ?> preserve existing.
-        assertContentEquals(intArrayOf(0, 4, 2, 0, 0), indents(text))
+        // opener(0) -> <?php opening line at depth 1 (4); body & ?> kept verbatim (-1).
+        assertContentEquals(intArrayOf(0, 4, -1, -1, 0), indents(text))
+    }
+
+    @Test
+    fun ignoresMultilineDirectiveInsidePhpIsland() {
+        // A multi-line `{{= … }}` that lives inside a <?php ?> island (e.g. a heredoc)
+        // is opaque PHP text, not a Qiq directive: it must not claim interior/close
+        // roles and reindent lines within the island. All island lines stay verbatim.
+        val text = "<?php\necho \"{{= foo([\n1,\n]) }}\";\n?>"
+        assertContentEquals(intArrayOf(0, -1, -1, -1, -1), indents(text))
     }
 
     @Test
@@ -90,12 +101,19 @@ class QiqReindentTest {
         assertContentEquals(indents(text), indents(once))
     }
 
-    /** Rewrite each line's leading whitespace to the computed width. */
+    /**
+     * Rewrite each line's leading whitespace to the computed width, mirroring
+     * [QiqPostFormatProcessor]: a LEAVE_AS_IS (-1) line is kept exactly as written.
+     */
     private fun applyIndents(text: String, indents: IntArray): String {
         val lines = text.split("\n")
         return lines.mapIndexed { i, line ->
             val content = line.trimStart(' ', '\t')
-            if (content.isEmpty()) "" else " ".repeat(indents[i]) + content
+            when {
+                indents[i] == QiqReindent.LEAVE_AS_IS -> line
+                content.isEmpty() -> ""
+                else -> " ".repeat(indents[i]) + content
+            }
         }.joinToString("\n")
     }
 }
