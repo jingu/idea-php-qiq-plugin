@@ -43,7 +43,7 @@
                 language="Qiq"
                 implementationClass="io.github.jingu.idea_qiq_plugin.editor.QiqCommenter"/>
         <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
-        <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
+        <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler" order="first"/>
 
         <!-- Code folding for Qiq block directives ({{ if }}/{{ endif }},
              foreach, for, setSection, setBlock). Backed by the shared
@@ -74,15 +74,11 @@
                 language="Qiq"
                 implementationClass="io.github.jingu.idea_qiq_plugin.structure.QiqStructureViewFactory"/>
 
-        <!-- Reformat Code for Qiq templates: indents the body of each block
-             directive (if/foreach/for/setSection/setBlock) one level and aligns
-             closers with openers, delegating HTML and injected PHP to their own
-             formatters via the template-language formatting framework. The indent
-             is derived from QiqBlockModel nesting depth, since the parser PSI is
-             flat. -->
-        <lang.formatter
-                language="Qiq"
-                implementationClass="io.github.jingu.idea_qiq_plugin.editor.QiqFormattingModelBuilder"/>
+        <!-- Reformat Code for Qiq templates: a post-format processor rewrites each
+             line's leading indentation to the combined HTML-tag + Qiq-block nesting
+             depth (QiqReindent). It runs after the normal format, so HTML's own
+             formatter and editor behaviours (e.g. Enter-between-tags indentation)
+             are left intact; only the final per-line indentation is normalised. -->
         <postFormatProcessor
                 implementation="io.github.jingu.idea_qiq_plugin.editor.QiqPostFormatProcessor"/>
 
