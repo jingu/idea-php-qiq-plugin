@@ -6,42 +6,45 @@ import kotlin.test.assertTrue
 
 /**
  * Tests the pure directive-head gate that decides where keyword completion fires.
- * [hostText] is the `{{ }}` block content; [caretInHost] the caret offset within it.
+ * [hostText] is the `{{ }}` block content; [tokenStartInHost] is the start offset
+ * of the directive token being completed within it (the typed prefix, or
+ * completion's synthetic dummy identifier when the head is still empty) — not the
+ * live caret.
  */
 class QiqDirectiveCompletionContributorTest {
 
-    private fun isHead(hostText: String, caretInHost: Int) =
-        QiqDirectiveCompletionContributor.isDirectiveHead(hostText, caretInHost)
+    private fun isHead(hostText: String, tokenStartInHost: Int) =
+        QiqDirectiveCompletionContributor.isDirectiveHead(hostText, tokenStartInHost)
 
     @Test
     fun firesAtEmptyHead() {
-        // `{{ | }}` — caret right after the opening brace, nothing typed.
+        // `{{ | }}` — nothing typed; completion's dummy identifier sits at the head.
         assertTrue(isHead("", 0))
         assertTrue(isHead("  ", 2))
     }
 
     @Test
     fun firesWhileTypingAKeyword() {
-        // `{{ if| }}` — the dummy identifier starts at offset 1 (after the space),
-        // so only the leading whitespace precedes the caret position.
+        // `{{ if| }}` — the typed token starts at offset 1 (after the space), so
+        // only the leading whitespace precedes the token start.
         assertTrue(isHead(" if", 1))
         assertTrue(isHead("   foreach", 3))
     }
 
     @Test
     fun doesNotFireMidExpression() {
-        // `{{ $x && if| }}` — non-whitespace precedes the caret: not a head.
+        // `{{ $x && if| }}` — non-whitespace precedes the token start: not a head.
         assertFalse(isHead("\$x && if", 6))
     }
 
     @Test
     fun doesNotFireAfterReceiver() {
-        // `{{ $this->set| }}` — the `$this->` qualifier precedes the caret.
+        // `{{ $this->set| }}` — the `$this->` qualifier precedes the token start.
         assertFalse(isHead("\$this->set", 7))
     }
 
     @Test
-    fun toleratesOutOfRangeCaret() {
+    fun toleratesOutOfRangeToken() {
         assertFalse(isHead("if", -1))
         assertFalse(isHead("if", 3))
     }

@@ -20,10 +20,10 @@ import io.github.jingu.idea_qiq_plugin.psi.QiqCodeHost
  * the template API (`setSection`/`getSection`/`setLayout`/`extends`, ...).
  *
  * Fires only at the *head* of a non-print code block — where nothing but
- * whitespace precedes the caret inside the `{{ }}` — so keywords are not offered
- * mid-expression or inside `{{= }}` / `{{h }}` output tags (those already get
- * helper and section-name completion). Call-style directives insert with `()` and
- * the caret between the parens, mirroring [QiqHelperCompletionContributor].
+ * whitespace precedes the token being completed inside the `{{ }}` — so keywords
+ * are not offered mid-expression or inside `{{= }}` / `{{h }}` output tags (those
+ * already get helper and section-name completion). Call-style directives insert
+ * with `()` and the caret between the parens, mirroring [QiqHelperCompletionContributor].
  */
 class QiqDirectiveCompletionContributor : CompletionContributor() {
 
@@ -52,8 +52,13 @@ class QiqDirectiveCompletionContributor : CompletionContributor() {
             // control directive; leave them to helper / section-name completion.
             if (host.isPrintLike()) return
 
-            val caretInHost = ilm.injectedToHost(position, position.textRange.startOffset) - host.textRange.startOffset
-            if (!isDirectiveHead(host.text, caretInHost)) return
+            // Start offset of the directive token being completed, in host
+            // coordinates. We take the *start* of `position` (the typed prefix, or
+            // completion's synthetic dummy identifier when the head is still empty)
+            // rather than the live caret, so the head gate stays satisfied while a
+            // keyword is being typed.
+            val tokenStartInHost = ilm.injectedToHost(position, position.textRange.startOffset) - host.textRange.startOffset
+            if (!isDirectiveHead(host.text, tokenStartInHost)) return
 
             // Keywords are case-insensitive (PHP keyword / method semantics), like
             // the built-in PHP completion.
@@ -71,12 +76,14 @@ class QiqDirectiveCompletionContributor : CompletionContributor() {
 
     companion object {
         /**
-         * True when the caret sits at the directive head of a `{{ }}` block: only
-         * whitespace precedes it inside the block content ([caretInHost] is the
-         * caret offset within the host text). Pure, unit-tested.
+         * True when the directive token sits at the head of a `{{ }}` block: only
+         * whitespace precedes it inside the block content. [tokenStartInHost] is the
+         * start offset of that token within the host text — the typed prefix, or
+         * completion's synthetic dummy identifier when the head is still empty — not
+         * the live caret. Pure, unit-tested.
          */
-        fun isDirectiveHead(hostText: String, caretInHost: Int): Boolean =
-            caretInHost in 0..hostText.length && hostText.substring(0, caretInHost).isBlank()
+        fun isDirectiveHead(hostText: String, tokenStartInHost: Int): Boolean =
+            tokenStartInHost in 0..hostText.length && hostText.substring(0, tokenStartInHost).isBlank()
 
         // The directive vocabulary. Control directives (if/foreach/for + else/end*)
         // are bare keywords; the template API (set/get/has Section, set/end Block,
