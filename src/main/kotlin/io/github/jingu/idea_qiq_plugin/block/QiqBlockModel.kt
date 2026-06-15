@@ -9,25 +9,32 @@ import java.util.Locale
  * Shares its directive set with [io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler]
  * (which auto-closes the same blocks). `if`/`foreach`/`for` use PHP alternative syntax,
  * so an opener is only a block when it is colon-terminated (`{{ if (...): }}`);
- * `setSection` / `setBlock` are call-style openers. The exact opener/closer parsing
- * here is deliberately stricter than the keyword set alone to avoid pairing
- * syntactically invalid directives. Heads are matched case-insensitively, as PHP
- * keywords and method names are.
+ * `setSection` / `setBlock` are call-style openers. A section is opened three ways —
+ * `setSection` (replace), `appendSection`, `prependSection` ([altOpenHeads]) — all
+ * paired with the same `endSection()` closer. The exact opener/closer parsing here is
+ * deliberately stricter than the keyword set alone to avoid pairing syntactically
+ * invalid directives. Heads are matched case-insensitively, as PHP keywords and
+ * method names are.
  */
 enum class QiqBlockType(
     val openHead: String,
     val closeHead: String,
     val closeText: String,
     val requiresColon: Boolean,
+    /** Extra openers that pair with the same closer, e.g. append/prepend for a section. */
+    val altOpenHeads: List<String> = emptyList(),
 ) {
     IF("if", "endif", "endif", true),
     FOREACH("foreach", "endforeach", "endforeach", true),
     FOR("for", "endfor", "endfor", true),
-    SECTION("setSection", "endSection", "endSection()", false),
+    SECTION("setSection", "endSection", "endSection()", false, altOpenHeads = listOf("appendSection", "prependSection")),
     BLOCK("setBlock", "endBlock", "endBlock()", false);
 
+    /** Every recognised opener head for this block: the primary plus any [altOpenHeads]. */
+    val openHeads: List<String> get() = listOf(openHead) + altOpenHeads
+
     companion object {
-        private val byOpenHead = entries.associateBy { it.openHead.lowercase(Locale.ROOT) }
+        private val byOpenHead = entries.flatMap { type -> type.openHeads.map { it.lowercase(Locale.ROOT) to type } }.toMap()
         private val byCloseHead = entries.associateBy { it.closeHead.lowercase(Locale.ROOT) }
 
         fun forOpenHead(head: String): QiqBlockType? = byOpenHead[head.lowercase(Locale.ROOT)]

@@ -127,7 +127,7 @@ object QiqSectionIndex {
                 remaining--
                 val text = readText(child) ?: continue
                 for (def in QiqSectionModel.definitions(text)) {
-                    definitions.add(QiqSectionLocation(child, def.name, "setSection", def.nameRange))
+                    definitions.add(QiqSectionLocation(child, def.name, def.head, def.nameRange))
                 }
                 for (use in QiqSectionModel.usages(text)) {
                     usages.add(QiqSectionLocation(child, use.name, use.head, use.nameRange))
