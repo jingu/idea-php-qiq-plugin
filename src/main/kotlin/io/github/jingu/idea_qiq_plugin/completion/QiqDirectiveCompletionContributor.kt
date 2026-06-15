@@ -82,8 +82,15 @@ class QiqDirectiveCompletionContributor : CompletionContributor() {
          * completion's synthetic dummy identifier when the head is still empty — not
          * the live caret. Pure, unit-tested.
          */
-        fun isDirectiveHead(hostText: String, tokenStartInHost: Int): Boolean =
-            tokenStartInHost in 0..hostText.length && hostText.substring(0, tokenStartInHost).isBlank()
+        fun isDirectiveHead(hostText: String, tokenStartInHost: Int): Boolean {
+            if (tokenStartInHost !in 0..hostText.length) return false
+            // Scan the prefix in place instead of allocating a substring; this is
+            // on the completion hot path.
+            for (i in 0 until tokenStartInHost) {
+                if (!hostText[i].isWhitespace()) return false
+            }
+            return true
+        }
 
         // The directive vocabulary. Control directives (if/foreach/for + else/end*)
         // are bare keywords; the template API (set/get/has Section, set/end Block,
