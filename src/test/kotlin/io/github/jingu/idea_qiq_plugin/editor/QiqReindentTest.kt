@@ -86,6 +86,22 @@ class QiqReindentTest {
     }
 
     @Test
+    fun keepsBlankLinesInsidePhpIslandVerbatim() {
+        // A whitespace-only line inside a <?php ?> island must be preserved (-1), not
+        // normalized to 0, since its whitespace can be significant (e.g. a heredoc).
+        val text = "{{ if (${'$'}a): }}\n<?php\n   \n?>\n{{ endif }}"
+        assertContentEquals(intArrayOf(0, 4, -1, -1, 0), indents(text))
+    }
+
+    @Test
+    fun doesNotTreatPrefixedKeywordAsCloser() {
+        // `endifoo()` merely starts with `endif`; it must not be treated as a closer
+        // and dedent its own line — it stays at the block body depth.
+        val text = "{{ if (${'$'}a): }}\n{{ endifoo() }}\n{{ endif }}"
+        assertContentEquals(intArrayOf(0, 4, 0), indents(text))
+    }
+
+    @Test
     fun masksHtmlInsideQiqOutputTags() {
         // The {{h ... }} inside the tag must not break the <main> open count.
         val text = "{{ if (${'$'}a): }}\n<main class=\"{{h ${'$'}x }}\">\ntext\n</main>\n{{ endif }}"

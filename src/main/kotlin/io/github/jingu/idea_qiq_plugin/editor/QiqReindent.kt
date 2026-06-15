@@ -35,7 +35,12 @@ object QiqReindent {
 
     private val TAG = Regex("<(/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*?)(/?)>")
     private val THIS_RECEIVER = Regex("^\\\$this\\s*->\\s*")
-    private val CLOSER = Regex("(?i)^(?:endif|endforeach|endfor|endsection\\s*\\(\\s*\\)|endblock\\s*\\(\\s*\\))")
+    // Require an identifier boundary after the bare `end*` keywords so a directive
+    // like `endifoo()` is not mistaken for `endif` (matching QiqBlockModel's stricter
+    // head parsing). The `(…)` form of endsection/endblock already ends on a paren.
+    private val CLOSER = Regex(
+        "(?i)^(?:end(?:if|foreach|for)(?![A-Za-z0-9_])|endsection\\s*\\(\\s*\\)|endblock\\s*\\(\\s*\\))"
+    )
     private val ELSE_LIKE = Regex("(?i)^(?:else|elseif)\\b")
 
     private enum class Directive { OPEN, CLOSE, DEDENT, NEUTRAL }
@@ -94,7 +99,10 @@ object QiqReindent {
         for (i in 0 until n) {
             val lineStart = lineStarts[i]
             val lineEnd = lineEnd(text, lineStarts, i)
-            if (isBlank(text, lineStart, lineEnd)) {
+            // A blank line normalises to no indent (0) so Reformat strips stray
+            // whitespace — except inside a preserved span, where a whitespace-only
+            // line may be significant (e.g. a heredoc body) and is kept verbatim.
+            if (role[i] != Role.PRESERVE && isBlank(text, lineStart, lineEnd)) {
                 result[i] = 0
                 continue
             }

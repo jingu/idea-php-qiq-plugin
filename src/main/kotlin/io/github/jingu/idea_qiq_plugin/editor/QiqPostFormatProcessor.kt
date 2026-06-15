@@ -4,6 +4,7 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleSettings
+import com.intellij.psi.codeStyle.CommonCodeStyleSettings
 import com.intellij.psi.impl.source.codeStyle.PostFormatProcessor
 import io.github.jingu.idea_qiq_plugin.lang.QiqFileType
 import io.github.jingu.idea_qiq_plugin.lang.QiqTemplateLanguage
@@ -14,11 +15,13 @@ import io.github.jingu.idea_qiq_plugin.lang.QiqTemplateLanguage
  * Qiq's flat PSI and HTML/PHP interleaving make a block-based formatting model
  * unworkable, so the indent is applied textually here instead: [QiqReindent]
  * computes the combined HTML-tag + Qiq-block indent for every line, and this
- * rewrites each line's leading whitespace to match. Only leading whitespace
- * changes; line content is untouched, and lines that [QiqReindent] marks
- * [QiqReindent.LEAVE_AS_IS] (the interior of `<?php … ?>` islands and `<!-- … -->`
- * comments) are skipped entirely so their original indentation — tabs included — is
- * preserved verbatim. The pass is conservative and idempotent.
+ * rewrites each line's leading whitespace to match, materialising it as tabs or
+ * spaces according to the code style's "Use tab character" option. Only leading
+ * whitespace changes; line content is untouched, whitespace-only lines are stripped
+ * to empty, and lines that [QiqReindent] marks [QiqReindent.LEAVE_AS_IS] (the
+ * interior of `<?php … ?>` islands and `<!-- … -->` comments) are skipped entirely
+ * so their original indentation — tabs included — is preserved verbatim. The pass is
+ * conservative and idempotent.
  */
 class QiqPostFormatProcessor : PostFormatProcessor {
 
@@ -35,7 +38,8 @@ class QiqPostFormatProcessor : PostFormatProcessor {
         val document = source.viewProvider.document ?: return rangeToReformat
 
         val text = document.immutableCharSequence
-        val indentSize = settings.getIndentSize(QiqFileType).coerceAtLeast(1)
+        val indentOptions = settings.getIndentOptions(QiqFileType)
+        val indentSize = indentOptions.INDENT_SIZE.coerceAtLeast(1)
         val indents = QiqReindent.computeLineIndents(text, indentSize)
 
         // Let a RangeMarker track the reformat range across edits: it stays accurate
@@ -58,10 +62,11 @@ class QiqPostFormatProcessor : PostFormatProcessor {
 
                 var contentStart = lineStart
                 while (contentStart < lineEnd && (text[contentStart] == ' ' || text[contentStart] == '\t')) contentStart++
-                if (contentStart == lineEnd) continue // blank line: leave it alone
+                // contentStart == lineEnd means a whitespace-only line: target is 0,
+                // so the replacement empties it (stray indentation is stripped).
 
                 val current = text.subSequence(lineStart, contentStart).toString()
-                val desired = " ".repeat(target)
+                val desired = buildIndent(indentOptions, target)
                 if (current != desired) {
                     document.replaceString(lineStart, contentStart, desired)
                 }
@@ -70,5 +75,17 @@ class QiqPostFormatProcessor : PostFormatProcessor {
         } finally {
             marker.dispose()
         }
+    }
+
+    /**
+     * Render an indent of [width] columns as tabs and/or spaces per the code style.
+     * With "Use tab character" on, full tab stops become tabs and the remainder
+     * spaces; otherwise all spaces.
+     */
+    private fun buildIndent(options: CommonCodeStyleSettings.IndentOptions, width: Int): String {
+        if (width <= 0) return ""
+        if (!options.USE_TAB_CHARACTER) return " ".repeat(width)
+        val tabSize = options.TAB_SIZE.coerceAtLeast(1)
+        return "\t".repeat(width / tabSize) + " ".repeat(width % tabSize)
     }
 }
