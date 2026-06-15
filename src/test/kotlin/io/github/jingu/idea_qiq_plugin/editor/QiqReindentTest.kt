@@ -65,6 +65,16 @@ class QiqReindentTest {
     }
 
     @Test
+    fun ignoresDirectiveLikeTextInsidePhpIsland() {
+        // A `{{ endif }}` sequence inside a single-line <?php ?> island is PHP
+        // string text, not a real directive: it must not close the surrounding
+        // `{{ if }}` block and so must not dedent the lines that follow it.
+        val text = "{{ if (${'$'}a): }}\n<?php echo '{{ endif }}'; ?>\n<div>x</div>\n{{ endif }}"
+        // if(0) -> php island stays in the body (4) -> <div> body (4) -> endif (0).
+        assertContentEquals(intArrayOf(0, 4, 4, 0), indents(text))
+    }
+
+    @Test
     fun masksHtmlInsideQiqOutputTags() {
         // The {{h ... }} inside the tag must not break the <main> open count.
         val text = "{{ if (${'$'}a): }}\n<main class=\"{{h ${'$'}x }}\">\ntext\n</main>\n{{ endif }}"

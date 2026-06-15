@@ -36,13 +36,15 @@ class QiqPostFormatProcessor : PostFormatProcessor {
         val indentSize = settings.getIndentSize(QiqFileType).coerceAtLeast(1)
         val indents = QiqReindent.computeLineIndents(text, indentSize)
 
+        var startDelta = 0
         var endDelta = 0
         // Bottom-up so each edit leaves the offsets of earlier lines unchanged.
         for (line in document.lineCount - 1 downTo 0) {
             if (line >= indents.size) continue
             val lineStart = document.getLineStartOffset(line)
             val lineEnd = document.getLineEndOffset(line)
-            if (lineStart > rangeToReformat.endOffset || lineEnd < rangeToReformat.startOffset) continue
+            // TextRange is half-open [start, end): skip lines that do not overlap it.
+            if (lineStart >= rangeToReformat.endOffset || lineEnd <= rangeToReformat.startOffset) continue
 
             var contentStart = lineStart
             while (contentStart < lineEnd && (text[contentStart] == ' ' || text[contentStart] == '\t')) contentStart++
@@ -52,11 +54,17 @@ class QiqPostFormatProcessor : PostFormatProcessor {
             val desired = " ".repeat(indents[line])
             if (current != desired) {
                 document.replaceString(lineStart, contentStart, desired)
-                if (lineStart < rangeToReformat.endOffset) endDelta += desired.length - current.length
+                // The leading-whitespace edit shifts every offset at/after contentStart,
+                // so adjust whichever range boundary sits past it (inclusive start,
+                // exclusive end) to keep the returned range accurate on selections.
+                val delta = desired.length - current.length
+                if (contentStart <= rangeToReformat.startOffset) startDelta += delta
+                if (contentStart < rangeToReformat.endOffset) endDelta += delta
             }
         }
 
-        val newEnd = (rangeToReformat.endOffset + endDelta).coerceIn(rangeToReformat.startOffset, document.textLength)
-        return TextRange(rangeToReformat.startOffset, newEnd)
+        val newStart = (rangeToReformat.startOffset + startDelta).coerceIn(0, document.textLength)
+        val newEnd = (rangeToReformat.endOffset + endDelta).coerceIn(newStart, document.textLength)
+        return TextRange(newStart, newEnd)
     }
 }

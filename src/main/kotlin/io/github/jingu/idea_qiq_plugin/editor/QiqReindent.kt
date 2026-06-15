@@ -57,7 +57,7 @@ object QiqReindent {
 
         val net = IntArray(n)
         val dedent = BooleanArray(n)
-        classifyQiq(text, lineStarts, net, dedent)
+        classifyQiq(text, lineStarts, net, dedent, opaque.filter { !it.qiq })
         classifyHtml(masked, lineStarts, net, dedent)
 
         // Assign each continuation line a role and the multi-line span it belongs
@@ -148,8 +148,20 @@ object QiqReindent {
         return String(chars)
     }
 
-    private fun classifyQiq(text: CharSequence, lineStarts: IntArray, net: IntArray, dedent: BooleanArray) {
+    private fun classifyQiq(
+        text: CharSequence,
+        lineStarts: IntArray,
+        net: IntArray,
+        dedent: BooleanArray,
+        opaqueNonQiq: List<Span>,
+    ) {
         for (directive in QiqBlockModel.scanDirectives(text)) {
+            // A `{{ … }}` sequence inside a `<?php … ?>` island or `<!-- … -->`
+            // comment is PHP/comment text, not a real directive; it must not move
+            // block depth. HTML scanning already masks these spans, so skip them
+            // here for parity.
+            val start = directive.range.startOffset
+            if (opaqueNonQiq.any { start >= it.start && start < it.end }) continue
             val kind = directiveKind(directive.inner) ?: continue
             val line = lineOf(lineStarts, directive.range.startOffset)
             when (kind) {
