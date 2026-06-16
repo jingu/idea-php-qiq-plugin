@@ -24,7 +24,9 @@ class QiqSectionNameCompletionFixtureTest : BasePlatformTestCase() {
         )
         myFixture.configureFromExistingVirtualFile(layout.virtualFile)
         // addFileToProject keeps `<caret>` literal, so place the caret in the quotes.
-        myFixture.editor.caretModel.moveToOffset(layout.text.indexOf(marker) + marker.length)
+        val markerIndex = layout.text.indexOf(marker)
+        assertTrue("marker '$marker' not found in fixture text", markerIndex >= 0)
+        myFixture.editor.caretModel.moveToOffset(markerIndex + marker.length)
         myFixture.completeBasic()
 
         val items = myFixture.lookupElementStrings ?: emptyList()

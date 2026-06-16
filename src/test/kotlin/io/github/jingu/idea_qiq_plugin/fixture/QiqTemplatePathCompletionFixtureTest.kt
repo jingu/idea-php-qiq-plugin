@@ -22,7 +22,9 @@ class QiqTemplatePathCompletionFixtureTest : BasePlatformTestCase() {
         myFixture.addFileToProject("$root/helper/Foo.php", "<?php\nclass Foo {}\n")
         val home = myFixture.addFileToProject("$root/template/page/home.qiq.php", homeBody)
         myFixture.configureFromExistingVirtualFile(home.virtualFile)
-        myFixture.editor.caretModel.moveToOffset(home.text.indexOf(marker) + marker.length)
+        val markerIndex = home.text.indexOf(marker)
+        assertTrue("marker '$marker' not found in fixture text", markerIndex >= 0)
+        myFixture.editor.caretModel.moveToOffset(markerIndex + marker.length)
         myFixture.completeBasic()
         return myFixture.lookupElementStrings ?: emptyList()
     }

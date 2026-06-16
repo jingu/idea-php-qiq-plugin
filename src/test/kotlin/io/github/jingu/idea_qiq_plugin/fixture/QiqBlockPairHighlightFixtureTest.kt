@@ -15,7 +15,9 @@ class QiqBlockPairHighlightFixtureTest : BasePlatformTestCase() {
 
     private fun usagesWithCaretOn(token: String): List<String> {
         myFixture.configureByText("page.qiq", source)
-        myFixture.editor.caretModel.moveToOffset(source.indexOf(token) + 3)
+        val tokenIndex = source.indexOf(token)
+        assertTrue("token '$token' not found in source", tokenIndex >= 0)
+        myFixture.editor.caretModel.moveToOffset(tokenIndex + 3)
         val target = myFixture.file.findElementAt(myFixture.editor.caretModel.offset)
             ?: error("no element at caret")
         val handler = QiqBlockPairHighlightUsagesHandlerFactory()
