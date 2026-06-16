@@ -43,7 +43,7 @@
                 language="Qiq"
                 implementationClass="io.github.jingu.idea_qiq_plugin.editor.QiqCommenter"/>
         <typedHandler implementation="io.github.jingu.idea_qiq_plugin.editor.QiqTypedHandler"/>
-        <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler"/>
+        <enterHandlerDelegate implementation="io.github.jingu.idea_qiq_plugin.editor.QiqEnterHandler" order="first"/>
 
         <!-- Code folding for Qiq block directives ({{ if }}/{{ endif }},
              foreach, for, setSection, setBlock). Backed by the shared
@@ -73,6 +73,14 @@
         <lang.psiStructureViewFactory
                 language="Qiq"
                 implementationClass="io.github.jingu.idea_qiq_plugin.structure.QiqStructureViewFactory"/>
+
+        <!-- Reformat Code for Qiq templates: a post-format processor rewrites each
+             line's leading indentation to the combined HTML-tag + Qiq-block nesting
+             depth (QiqReindent). It runs after the normal format, so HTML's own
+             formatter and editor behaviours (e.g. Enter-between-tags indentation)
+             are left intact; only the final per-line indentation is normalised. -->
+        <postFormatProcessor
+                implementation="io.github.jingu.idea_qiq_plugin.editor.QiqPostFormatProcessor"/>
 
         <!-- Warn on structurally invalid Qiq blocks: unclosed openers, closers
              with no opener, and closers that do not match the nearest open
