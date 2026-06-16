@@ -79,11 +79,16 @@ object QiqReindent {
         val role = Array(n) { Role.NORMAL }
         val spanOf = IntArray(n) { -1 }
         val spanOpensAtLine = IntArray(n) { -1 }
+        // A multi-line PHP island / comment is opaque: its opening line is kept
+        // verbatim too so the whole island is left exactly as written (no asymmetric
+        // indent), while depth accounting on that line still runs (e.g. a leading
+        // `<div>` before `<?php` must still nest the lines that follow).
+        val preserveOpeningLine = BooleanArray(n)
         val multi = opaque.filter { lineOf(lineStarts, it.start) != lineOf(lineStarts, it.end - 1) }
         for ((idx, span) in multi.withIndex()) {
             val startLine = lineOf(lineStarts, span.start)
             val endLine = lineOf(lineStarts, span.end - 1)
-            spanOpensAtLine[startLine] = idx
+            if (span.qiq) spanOpensAtLine[startLine] = idx else preserveOpeningLine[startLine] = true
             for (line in startLine + 1..endLine) {
                 spanOf[line] = idx
                 role[line] = when {
@@ -115,6 +120,9 @@ object QiqReindent {
                     result[i] = level * indentSize
                     if (spanOpensAtLine[i] >= 0) openIndent[spanOpensAtLine[i]] = result[i]
                     depth = (depth + net[i]).coerceAtLeast(0)
+                    // Depth has been updated; leave the opaque island's opening line
+                    // itself untouched.
+                    if (preserveOpeningLine[i]) result[i] = LEAVE_AS_IS
                 }
             }
         }

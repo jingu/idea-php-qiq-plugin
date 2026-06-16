@@ -40,10 +40,10 @@ class QiqReindentTest {
 
     @Test
     fun preservesPhpIslandLinesAndKeepsItAtColumnZero() {
-        // The island interior is marked LEAVE_AS_IS (-1) so its indentation is kept
-        // verbatim; only the `<?php` opener line and the Qiq block are reindented.
+        // The whole island — `<?php`, body, and `?>` — is LEAVE_AS_IS (-1); only the
+        // Qiq block that follows is reindented.
         val text = "<?php\n${'$'}x = 1;\n?>\n{{ if (${'$'}a): }}\nx\n{{ endif }}"
-        assertContentEquals(intArrayOf(0, -1, -1, 0, 4, 0), indents(text))
+        assertContentEquals(intArrayOf(-1, -1, -1, 0, 4, 0), indents(text))
     }
 
     @Test
@@ -62,8 +62,9 @@ class QiqReindentTest {
         // A <?php ?> island inside a block: the opener indents, but the PHP body is
         // left exactly as written (no reflow).
         val text = "{{ if (${'$'}a): }}\n<?php\n  ${'$'}x = 1;\n?>\n{{ endif }}"
-        // opener(0) -> <?php opening line at depth 1 (4); body & ?> kept verbatim (-1).
-        assertContentEquals(intArrayOf(0, 4, -1, -1, 0), indents(text))
+        // opener(0); the whole <?php … ?> island is kept verbatim (-1), including
+        // its `<?php` opening line, so its indentation is never asymmetric.
+        assertContentEquals(intArrayOf(0, -1, -1, -1, 0), indents(text))
     }
 
     @Test
@@ -72,7 +73,7 @@ class QiqReindentTest {
         // is opaque PHP text, not a Qiq directive: it must not claim interior/close
         // roles and reindent lines within the island. All island lines stay verbatim.
         val text = "<?php\necho \"{{= foo([\n1,\n]) }}\";\n?>"
-        assertContentEquals(intArrayOf(0, -1, -1, -1, -1), indents(text))
+        assertContentEquals(intArrayOf(-1, -1, -1, -1, -1), indents(text))
     }
 
     @Test
@@ -86,11 +87,19 @@ class QiqReindentTest {
     }
 
     @Test
+    fun keepsOpeningLineDepthWhenTagPrecedesPhp() {
+        // The island's opening line is kept verbatim (-1), but a `<div>` before the
+        // `<?php` on that line must still nest the HTML that follows the island.
+        val text = "<div><?php\n${'$'}x = 1;\n?>\n<p>x</p>\n</div>"
+        assertContentEquals(intArrayOf(-1, -1, -1, 4, 0), indents(text))
+    }
+
+    @Test
     fun keepsBlankLinesInsidePhpIslandVerbatim() {
         // A whitespace-only line inside a <?php ?> island must be preserved (-1), not
         // normalized to 0, since its whitespace can be significant (e.g. a heredoc).
         val text = "{{ if (${'$'}a): }}\n<?php\n   \n?>\n{{ endif }}"
-        assertContentEquals(intArrayOf(0, 4, -1, -1, 0), indents(text))
+        assertContentEquals(intArrayOf(0, -1, -1, -1, 0), indents(text))
     }
 
     @Test
