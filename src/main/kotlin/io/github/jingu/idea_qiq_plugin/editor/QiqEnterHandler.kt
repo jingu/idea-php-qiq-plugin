@@ -8,6 +8,7 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFile
 import io.github.jingu.idea_qiq_plugin.block.QiqBlockModel
+import io.github.jingu.idea_qiq_plugin.block.QiqBlockType
 import io.github.jingu.idea_qiq_plugin.lang.QiqTemplateLanguage
 
 class QiqEnterHandler : EnterHandlerDelegateAdapter() {
@@ -16,11 +17,8 @@ class QiqEnterHandler : EnterHandlerDelegateAdapter() {
         // 行末に現れる HTML 開きタグ（attrs に < や > は含まない）。
         private val TRAILING_OPEN_TAG = Regex("<([a-zA-Z][a-zA-Z0-9-]*)([^<>]*)>\\s*$")
 
-        // 閉じタグを持たない void 要素。Enter で本文を作らない。
-        private val VOID_ELEMENTS = setOf(
-            "area", "base", "br", "col", "embed", "hr", "img", "input",
-            "link", "meta", "param", "source", "track", "wbr",
-        )
+        // `{{ ... }}` の中身先頭にある `$this->` レシーバ（クローザー照合の正規化用）。
+        private val THIS_RECEIVER = Regex("^\\\$this\\s*->\\s*")
     }
 
     private fun isQiqFile(file: PsiFile): Boolean {
@@ -164,8 +162,9 @@ class QiqEnterHandler : EnterHandlerDelegateAdapter() {
         if (!text.subSequence(curOffset, curLineEnd).isBlank()) return Result.Continue
 
         // クローザー挿入は、この opener が未クローズで直下に既存クローザーが無い場合だけ。
+        // 直下クローザーの照合は大文字小文字と `$this->` を許容（QiqBlockModel と同じ正規化）。
         val nextNonEmpty = findNextNonEmptyLineText(doc, doc.getLineStartOffset(curLine))
-        val closerAlreadyBelow = nextNonEmpty?.trimStart()?.startsWith("{{ $closer") == true
+        val closerAlreadyBelow = nextNonEmpty != null && isCloserLineFor(nextNonEmpty, blockType)
         val insertCloser = !isOpenerClosed(text, openPos) && !closerAlreadyBelow
 
         WriteCommandAction.runWriteCommandAction(file.project) {
@@ -187,7 +186,23 @@ class QiqEnterHandler : EnterHandlerDelegateAdapter() {
         val m = TRAILING_OPEN_TAG.find(line) ?: return null
         if (m.groupValues[2].trimEnd().endsWith("/")) return null // 自己終了タグ
         val name = m.groupValues[1].lowercase()
-        return if (name in VOID_ELEMENTS) null else name
+        return if (name in HTML_VOID_ELEMENTS) null else name
+    }
+
+    /**
+     * [lineText] が [blockType] の閉じディレクティブ（`{{ endif }}` 等）かどうか。
+     * QiqBlockModel と同様、キーワードは大文字小文字を無視し、`{{ $this->endSection() }}`
+     * のような明示レシーバも許容する。
+     */
+    private fun isCloserLineFor(lineText: String, blockType: QiqBlockType): Boolean {
+        val trimmed = lineText.trimStart()
+        if (!trimmed.startsWith("{{")) return false
+        val close = trimmed.indexOf("}}")
+        if (close < 0) return false
+        val head = trimmed.substring(2, close).trim()
+            .replaceFirst(THIS_RECEIVER, "")
+            .takeWhile { it.isLetterOrDigit() || it == '_' }
+        return head.equals(blockType.closeHead, ignoreCase = true)
     }
 
     // 設定に従った 1 段分のインデント文字列（タブ or スペース）。

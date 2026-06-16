@@ -27,12 +27,6 @@ object QiqReindent {
     /** Sentinel in [computeLineIndents]'s result: leave the line's indent verbatim. */
     const val LEAVE_AS_IS = -1
 
-    // Elements that never have a closing tag, so they must not push HTML depth.
-    private val VOID_ELEMENTS = setOf(
-        "area", "base", "br", "col", "embed", "hr", "img", "input",
-        "link", "meta", "param", "source", "track", "wbr",
-    )
-
     private val TAG = Regex("<(/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*?)(/?)>")
     private val THIS_RECEIVER = Regex("^\\\$this\\s*->\\s*")
     // Require an identifier boundary after the bare `end*` keywords so a directive
@@ -223,7 +217,7 @@ object QiqReindent {
         for (match in TAG.findAll(masked)) {
             val isClose = match.groupValues[1] == "/"
             val name = match.groupValues[2].lowercase()
-            val selfClosing = match.groupValues[4] == "/" || name in VOID_ELEMENTS
+            val selfClosing = match.groupValues[4] == "/" || name in HTML_VOID_ELEMENTS
             val line = lineOf(lineStarts, match.range.first)
             when {
                 isClose -> {
