@@ -9,7 +9,6 @@ import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.FunctionReference
 import com.jetbrains.php.lang.psi.elements.MethodReference
 import com.jetbrains.php.lang.psi.elements.Parameter
-import com.jetbrains.php.lang.psi.elements.ParameterList
 import com.jetbrains.php.lang.psi.elements.PhpTypedElement
 import com.jetbrains.php.lang.psi.resolve.types.PhpType
 import com.jetbrains.php.lang.psi.visitors.PhpElementVisitor
@@ -65,7 +64,7 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
         if (hasUncountableArgument(parameterList.text)) return
 
         val args = parameterList.parameters
-        if (checkArgumentCount(name, args.size, targets, parameterList, holder)) return
+        if (checkArgumentCount(name, args.size, targets, call, holder)) return
 
         // Type-check only against a single unambiguous target.
         targets.singleOrNull()?.let { checkArgumentTypes(name, args, it, call.project, holder) }
@@ -76,7 +75,7 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
         name: String,
         argCount: Int,
         targets: List<Function>,
-        parameterList: ParameterList,
+        call: FunctionReference,
         holder: ProblemsHolder,
     ): Boolean {
         // Valid as soon as one target accepts the count. Checking per target (not
@@ -96,7 +95,11 @@ class QiqHelperArgumentsInspection : LocalInspectionTool() {
                 // global window, so neither "too few" nor "too many" fits.
                 QiqBundle.message("inspection.helper.argcount.invalid", name, argCount)
         }
-        holder.registerProblem(parameterList, message)
+        // Anchor on the argument list, but fall back to the whole call when it is
+        // empty (`name()`): an empty `()` parameter list has a zero-width range,
+        // which registerProblem rejects.
+        val anchor: PsiElement = call.parameterList?.takeUnless { it.textRange.isEmpty } ?: call
+        holder.registerProblem(anchor, message)
         return true
     }
 

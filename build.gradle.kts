@@ -29,8 +29,12 @@ dependencies {
         testFramework(TestFrameworkType.JUnit5)
     }
     testImplementation(kotlin("test"))
+    // BasePlatformTestCase / HeavyPlatformTestCase derive from JUnit3's TestCase, so
+    // JUnit4 must be on the compile classpath and the vintage engine present to run
+    // them under useJUnitPlatform() alongside the JUnit5 unit tests.
+    testImplementation("junit:junit:4.13.2")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
-    testRuntimeOnly("junit:junit:4.13.2")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine")
 }
 
 val intellijTestDependencies = configurations.named("intellijPlatformTestDependencies")
@@ -106,4 +110,9 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    // Fixture tests (BasePlatformTestCase) share an Application; the platform's
+    // leaked-project hunter can flag a still-watched light project when those
+    // classes run alongside the JUnit5 unit classes. Forking a fresh JVM per test
+    // class isolates each so the hunter only ever sees one suite's projects.
+    setForkEvery(1)
 }
