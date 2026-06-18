@@ -293,23 +293,28 @@
         </action>
     </actions>
     <change-notes><![CDATA[
+<p><b>1.0</b> &mdash; native template-language feature parity for Qiq.</p>
 <ul>
-  <li><b>Section names as symbols</b>
+  <li><b>Reformat Code &amp; smart Enter</b>
     <ul>
-      <li>Completion of section names in <code>getSection('&hellip;')</code> / <code>hasSection('&hellip;')</code>, drawn from the <code>setSection</code> definitions across the detected template roots.</li>
-      <li>Go to Declaration both ways: <code>getSection</code>/<code>hasSection</code> jump to the matching <code>setSection</code> definitions, and <code>setSection</code> jumps to its <code>getSection</code>/<code>hasSection</code> usages (the chooser shows each target's file and line). Works even when the name collides with a PHP function such as <code>'header'</code>.</li>
-      <li>Inspection: a <code>getSection('x')</code> whose name no template defines is flagged (conservatively &mdash; <code>hasSection</code> is left alone, since it tests a possibly-absent name).</li>
+      <li>Reformat Code now indents Qiq blocks and HTML together: block bodies (<code>if</code>/<code>foreach</code>/<code>for</code>/<code>setSection</code>/<code>setBlock</code>) and nested tags are re-indented to their combined depth and closers line up with their openers. The interiors of <code>&lt;?php &hellip; ?&gt;</code> islands and <code>&lt;!-- &hellip; --&gt;</code> comments are kept verbatim (tabs included), it follows the &quot;Use tab character&quot; code-style option, and it is idempotent.</li>
+      <li>Enter inside a tag pair (<code>&lt;div&gt;|&lt;/div&gt;</code>) expands it with the caret one level deeper; Enter after a block opener indents the body and auto-inserts the matching closer when one is missing.</li>
     </ul>
   </li>
-  <li><b><code>$this-&gt;</code>-qualified Qiq calls</b>
+  <li><b>Find Usages &amp; Rename across templates</b>
     <ul>
-      <li><code>{{ $this-&gt;setSection('x') }}</code>&hellip;<code>{{ $this-&gt;endSection() }}</code> now fold, pair, and validate like the bare form.</li>
-      <li><code>$this-&gt;setSection(...)</code> and the other template methods resolve for Go to Declaration and argument checks, while dynamic data (<code>$this-&gt;var</code>) and helper calls keep working without false warnings.</li>
+      <li>Rename a template file (Shift+F6) and the <code>render()</code>, <code>setLayout()</code>, <code>include()</code>, and <code>extends()</code> path references that point at it are updated &mdash; both from PHP and from inside templates. Find Usages lists those references too.</li>
     </ul>
   </li>
-  <li><b>Unified template-path resolution</b>
+  <li><b>Directive completion &amp; Live Templates</b>
     <ul>
-      <li>Path completion, Go to Declaration, and the missing-template inspection now share a single resolver, so a path that completes is a path that navigates and is not falsely flagged &mdash; removing edge-case disagreements in unusual template layouts.</li>
+      <li>Keyword completion at the head of a <code>{{ }}</code> block offers the control directives (<code>if</code>/<code>foreach</code>/<code>for</code> and their <code>else</code>/<code>end&hellip;</code> partners) and the template API (<code>setSection</code>, <code>setLayout</code>, <code>extends</code>, &hellip;); call-style directives insert with their parentheses.</li>
+      <li>Bundled Live Templates for the common blocks: <code>qif</code>, <code>qforeach</code>, <code>qfor</code>, <code>qsection</code>, <code>qblock</code>, <code>qlayout</code>.</li>
+    </ul>
+  </li>
+  <li><b><code>appendSection</code> / <code>prependSection</code></b>
+    <ul>
+      <li>Recognized as section definitions, so they feed section-name completion, navigation, and the undefined-section inspection alongside <code>setSection</code>.</li>
     </ul>
   </li>
 </ul>
