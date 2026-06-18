@@ -41,8 +41,8 @@ class QiqTemplatePathCompletionFixtureTest : BasePlatformTestCase() {
     fun testRootAbsoluteTemplatePathsOffered() {
         val items = completionInside("{{ render('/') }}{{ if (\$z): }}<b>z</b>{{ endif }}", "render('/")
         assertTrue(
-            "expected a root-absolute layout/base candidate, got: $items",
-            items.any { it.contains("layout/base") },
+            "expected a root-absolute (/-prefixed) layout/base candidate, got: $items",
+            items.any { it.startsWith("/") && it.contains("layout/base") },
         )
     }
 }
